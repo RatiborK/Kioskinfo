@@ -70,6 +70,15 @@ function changeSection(section:(typeof items)[number]['id']){
   }
 }
 function focusSearchInput(){searchInput.value?.focus({preventScroll:true});}
+function focusSchedulePanel(){
+  if(selectedSchedule.value){
+    document.querySelector<HTMLElement>('.schedule-detail [data-schedule-title]')?.focus({preventScroll:true});
+  }else if(searchOpen.value){
+    focusSearchInput();
+  }else{
+    document.querySelector<HTMLElement>('.schedule-index-layout .schedule-button')?.focus({preventScroll:true});
+  }
+}
 function focusCurrentPage(){
   if(searchOpen.value && (current.value==='schedule'||current.value==='groups')){
     focusSearchInput();return;
@@ -147,7 +156,8 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         <div class="brand-glyph" aria-hidden="true">Н</div>
         <div class="brand-copy"><strong>НАВИКУЛЬТУРА</strong><span>ЦИФРОВОЙ ИНФОЦЕНТР · ГДК «КИРОВСКИЙ»</span></div>
         <button type="button" class="kiosk-search-trigger" :class="{active:searchOpen&&(current==='schedule'||current==='groups')}"
-          :aria-expanded="searchOpen&&(current==='schedule'||current==='groups')" aria-controls="kiosk-search-panel"
+          :aria-expanded="searchOpen&&(current==='schedule'||current==='groups')"
+          :aria-controls="searchOpen&&(current==='schedule'||current==='groups')?'kiosk-search-panel':undefined"
           :aria-label="searchOpen&&(current==='schedule'||current==='groups')?'Закрыть поиск':'Открыть поиск по коллективам'"
           title="Поиск" @click="toggleSearch">
           <svg viewBox="0 0 24 24" aria-hidden="true" width="27" height="27" fill="none"
@@ -184,12 +194,12 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
       </section>
       <section v-else-if="current==='schedule'||current==='groups'" class="schedule-section" aria-live="polite">
         <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1 data-page-title tabindex="-1">{{current==='groups'?'Коллективы':'Расписание'}}<span class="dot">.</span></h1></div>
-        <Transition name="kiosk-detail" mode="out-in">
+        <Transition name="kiosk-detail" mode="out-in" @after-enter="focusSchedulePanel">
           <div v-if="selectedSchedule" :key="'detail:'+selectedSchedule.id" class="schedule-detail-layout">
           <button type="button" class="schedule-back" @click="backToSchedule">← Все направления</button>
           <article class="schedule-detail">
             <span class="eyebrow">КАРТОЧКА КОЛЛЕКТИВА</span>
-            <h2>{{selectedSchedule.group}}</h2>
+            <h2 data-schedule-title tabindex="-1">{{selectedSchedule.group}}</h2>
             <div class="schedule-detail-rows">
               <p v-if="selectedSchedule.leader"><b>Руководитель</b><span>{{selectedSchedule.leader}}</span></p>
               <p v-if="selectedSchedule.time"><b>Занятия</b><span>{{selectedSchedule.time}}</span></p>
