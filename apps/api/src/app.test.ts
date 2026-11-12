@@ -10,6 +10,7 @@ import { defaultScheduleFields, type ScheduleRepository } from './schedule.js';
 import { FileThemeRepository } from './themes.js';
 import { FileEventsRepository } from './events.js';
 import { FolderDocumentsRepository } from './documents.js';
+import {FileCultureRepository,CultureMedia,defaultCultureState} from './culture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -266,5 +267,68 @@ test('calendar and documents APIs protect editing and publish only approved even
     assert.equal(removed.statusCode,200);
     assert.equal((await app.inject({method:'GET',url:'/api/public/documents'})).json().documents.length,0);
     assert.ok(store.events.includes('events.publish'));assert.ok(store.events.includes('documents.upload'));
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
+});
+
+test('public cultural pages are seeded, staff edits stay in draft until admin publishes',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-culture-api-'));
+  const store=new MemoryStore();
+  store.accounts=[{id:'cultureadmin',username:'cultureadmin',display_name:'Администратор',role:'admin',
+    password_hash:await hashPassword('another-long-test-password-2026'),enabled:true}];
+  const culture=new FileCultureRepository(join(dir,'catalog.json')),cultureMedia=new CultureMedia(join(dir,'images'));
+  const app=createApp({store,culture,cultureMedia,allowedOrigin:'http://127.0.0.1:5173'});
+  try{
+    const initial=await app.inject({method:'GET',url:'/api/public/culture'});
+    assert.equal(initial.statusCode,200);
+    assert.ok(initial.json().content.collectives.length>=35);
+    const anon=await app.inject({method:'PATCH',url:'/api/editor/culture',headers,
+      payload:{content:initial.json().content,expectedRevision:1}});
+    assert.equal(anon.statusCode,401);
+    const login=await app.inject(loginBody('cultureadmin','another-long-test-password-2026'));
+    assert.equal(login.statusCode,200);
+    const cookie=String(login.headers['set-cookie']).split(';')[0],authed={...headers,cookie};
+    const editor=await app.inject({method:'GET',url:'/api/editor/culture',headers:{cookie}});
+    assert.equal(editor.statusCode,200);
+    const draft=structuredClone(editor.json().state.draft);
+    draft.about.intro='Новое вступление, ещё не опубликовано';
+    const saved=await app.inject({method:'PATCH',url:'/api/editor/culture',headers:authed,
+      payload:{content:draft,expectedRevision:1}});
+    assert.equal(saved.statusCode,200);
+    assert.equal(saved.json().state.revision,2);
+    assert.notEqual((await app.inject({method:'GET',url:'/api/public/culture'})).json().content.about.intro,draft.about.intro);
+    const conflict=await app.inject({method:'PATCH',url:'/api/editor/culture',headers:authed,
+      payload:{content:draft,expectedRevision:1}});
+    assert.equal(conflict.statusCode,409);
+    const published=await app.inject({method:'POST',url:'/api/editor/culture/publish',headers:authed,
+      payload:{expectedRevision:2}});
+    assert.equal(published.statusCode,200);
+    assert.equal((await app.inject({method:'GET',url:'/api/public/culture'})).json().content.about.intro,draft.about.intro);
+    const image=Buffer.from([137,80,78,71,13,10,26,10,1,2,3,4]).toString('base64');
+    const upload=await app.inject({method:'POST',url:'/api/editor/culture/photo',headers:authed,
+      payload:{fileName:'portrait.png',base64:image}});
+    assert.equal(upload.statusCode,201);
+    assert.match(upload.json().url,/^\/api\/public\/culture\/media\//);
+    assert.equal((await app.inject({method:'GET',url:upload.json().url})).statusCode,200);
+    assert.ok(store.events.includes('culture.publish'));
+    assert.ok(store.events.includes('culture.photo'));
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
+});
+test('viewer cannot edit or publish cultural content',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-culture-viewer-'));
+  const store=new MemoryStore();
+  store.accounts=[{id:'viewer-culture',username:'viewerculture',display_name:'Наблюдатель',role:'viewer',
+    password_hash:await hashPassword('test-secret-for-viewer-2026'),enabled:true}];
+  const app=createApp({store,culture:new FileCultureRepository(join(dir,'catalog.json')),
+    cultureMedia:new CultureMedia(join(dir,'photos')),allowedOrigin:'http://127.0.0.1:5173'});
+  try{
+    const login=await app.inject(loginBody('viewerculture','test-secret-for-viewer-2026'));
+    assert.equal(login.statusCode,200);
+    const cookie=String(login.headers['set-cookie']).split(';')[0];
+    const authed={...headers,cookie};
+    assert.equal((await app.inject({method:'GET',url:'/api/editor/culture',headers:{cookie}})).statusCode,200);
+    assert.equal((await app.inject({method:'PATCH',url:'/api/editor/culture',headers:authed,
+      payload:{content:defaultCultureState().draft,expectedRevision:1}})).statusCode,403);
+    assert.equal((await app.inject({method:'POST',url:'/api/editor/culture/publish',headers:authed,
+      payload:{expectedRevision:1}})).statusCode,403);
   }finally{await app.close();await rm(dir,{recursive:true,force:true});}
 });
