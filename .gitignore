@@ -17,3 +17,8 @@ backups/
 *.sqlite
 *.sqlite3
 *.db
+
+.env
+.env.*
+!.env.example
+*.backup.sql

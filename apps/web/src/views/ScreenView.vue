@@ -1,6 +1,6 @@
 <!-- apps/web/src/views/ScreenView.vue — first visual prototype; no real posters yet. -->
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 
 const items = [
   { id: 'posters', label: 'Афиша', icon: '✦' },
@@ -11,6 +11,12 @@ const items = [
   { id: 'contacts', label: 'Контакты', icon: '↗' },
 ] as const;
 const current = ref<(typeof items)[number]['id']>('posters');
+const welcome = ref<{ title:string; body:string } | null>(null);
+onMounted(async () => {
+  try { const response = await fetch('/api/public/pages/welcome', {cache:'no-store'});
+    if (response.ok) {const data:{page:{title:string;body:string}} = await response.json(); welcome.value=data.page;}
+  } catch { /* available only when API and DB are running */ }
+});
 const selected = computed(() => items.find((item) => item.id === current.value) ?? items[0]);
 </script>
 
@@ -29,7 +35,7 @@ const selected = computed(() => items.find((item) => item.id === current.value) 
         <p v-else-if="current === 'schedule'">Расписание занятий и мероприятий будет формироваться автоматически из данных сотрудников.</p>
         <p v-else-if="current === 'groups'">Информация о творческих коллективах, руководителях и направлениях.</p>
         <p v-else-if="current === 'navigation'">Поиск помещений и интерактивная навигация по зданию.</p>
-        <p v-else-if="current === 'about'">Информация об учреждении и его деятельности.</p>
+        <p v-else-if="current === 'about'">{{ welcome?.body ?? 'Информация об учреждении и его деятельности.' }}</p>
         <p v-else>Контакты и сведения для посетителей.</p>
         <div class="feature-grid">
           <div class="feature-primary"><span class="feature-index">01 / НАВИКУЛЬТУРА</span><b>ИНФОРМАЦИЯ<br/>БЕЗ ОЖИДАНИЯ</b><span>Автоматическое обновление материалов</span></div>
