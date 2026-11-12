@@ -27,6 +27,7 @@ export interface ScheduleRepository {
   archive(id: string, expectedRevision: number): Promise<boolean>;
 }
 
+const names:Record<string,string>={label:'Название кнопки',group:'Коллектив',leader:'Руководитель',time:'Расписание',room:'Кабинет',description:'Описание',age:'Возраст'};
 const lengths: Record<keyof Pick<ScheduleFields, 'label'|'group'|'leader'|'time'|'room'|'description'|'age'>, number> = {
   label: 70, group: 140, leader: 140, time: 200, room: 80, description: 2500, age: 100,
 };
@@ -35,7 +36,7 @@ export function validateScheduleFields(input: unknown): ScheduleFields {
   const body = input as Record<string, unknown>;
   const fields: Record<string, string> = {};
   for (const [name, limit] of Object.entries(lengths)) {
-    if (typeof body[name] !== 'string' || body[name].length > limit) throw new Error(`Поле «${name}» должно быть текстом длиной не более ${limit} символов`);
+    if (typeof body[name] !== 'string' || body[name].length > limit) throw new Error(`Поле «${names[name]}» должно быть текстом длиной не более ${limit} символов`);
     fields[name] = body[name].trim();
   }
   if (!fields.label || !fields.group) throw new Error('Заполните название кнопки и название коллектива');
