@@ -3,10 +3,33 @@
 import { createHash } from 'node:crypto';
 
 export type ButtonTheme = 'orange' | 'blue' | 'neutral';
+export interface ButtonAppearance {
+  fill: 'outline' | 'solid';
+  radius: 'square' | 'soft' | 'pill';
+  titleSize: 'normal' | 'large' | 'huge';
+  align: 'left' | 'center';
+}
+export function defaultAppearance(): ButtonAppearance {
+  return { fill:'outline', radius:'square', titleSize:'normal', align:'left' };
+}
+/** Allow older local JSON and published PostgreSQL snapshots without an appearance property. */
+export function validateAppearance(value: unknown): ButtonAppearance {
+  if (value === undefined) return defaultAppearance();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Некорректные настройки внешнего вида');
+  const a = value as Record<string, unknown>;
+  if (!['outline','solid'].includes(String(a.fill)) ||
+      !['square','soft','pill'].includes(String(a.radius)) ||
+      !['normal','large','huge'].includes(String(a.titleSize)) ||
+      !['left','center'].includes(String(a.align)) ||
+      Object.keys(a).some(key => !['fill','radius','titleSize','align'].includes(key)))
+    throw new Error('Недопустимое оформление кнопки');
+  return {fill:a.fill as ButtonAppearance['fill'],radius:a.radius as ButtonAppearance['radius'],
+    titleSize:a.titleSize as ButtonAppearance['titleSize'],align:a.align as ButtonAppearance['align']};
+}
 export interface ScheduleFields {
   label: string; group: string; leader: string; time: string;
   room: string; description: string; age: string;
-  theme: ButtonTheme; inheritTheme: boolean; position: number;
+  theme: ButtonTheme; inheritTheme: boolean; position: number; appearance: ButtonAppearance;
 }
 export interface ScheduleRecord extends ScheduleFields {
   id: string; revision: number; published: ScheduleFields | null;
@@ -46,19 +69,23 @@ export function validateScheduleFields(input: unknown): ScheduleFields {
   return { ...fields, label: fields.label, group: fields.group, leader: fields.leader,
     time: fields.time, room: fields.room, description: fields.description, age: fields.age,
     theme: body.theme as ButtonTheme, inheritTheme: body.inheritTheme as boolean,
-    position: body.position as number };
+    position: body.position as number, appearance:validateAppearance(body.appearance) };
 }
 export function defaultScheduleFields(label = 'Новый раздел', group = 'Новый коллектив'): ScheduleFields {
   return { label, group, leader: '', time: '', room: '', description: '', age: '',
-    theme: 'orange', inheritTheme: false, position: 0 };
+    theme: 'orange', inheritTheme: false, position: 0, appearance: defaultAppearance() };
 }
 export function publishedCatalog(records: ScheduleRecord[], stale = false, message = ''): ScheduleCatalog {
   const ordered = [...records].sort((a,b) => (a.published?.position ?? a.position) - (b.published?.position ?? b.position) || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
   const visible = ordered.filter(row => row.published != null);
-  const baseTheme = visible[0]?.published?.theme ?? 'orange';
-  const entries: ScheduleEntry[] = visible.map(row => {
-    const fields = row.published!;
-    return { ...fields, id: row.id, theme: fields.inheritTheme ? baseTheme : fields.theme };
+  const base = visible[0]?.published ? validateScheduleFields(visible[0].published) : defaultScheduleFields();
+  const entries: ScheduleEntry[] = visible.map((row, index) => {
+    const fields = validateScheduleFields(row.published!);
+    // The first published button defines the template. Only published snapshots affect the kiosk.
+    const inherit = index > 0 && fields.inheritTheme;
+    return { ...fields, id: row.id,
+      theme: inherit ? base.theme : fields.theme,
+      appearance: inherit ? { ...base.appearance } : { ...fields.appearance } };
   });
   const version = createHash('sha256').update(JSON.stringify(entries)).digest('hex').slice(0, 16);
   const updatedAt = visible.reduce<string | null>((latest, row) => !latest || (row.published_at && row.published_at > latest) ? row.published_at : latest, null);
