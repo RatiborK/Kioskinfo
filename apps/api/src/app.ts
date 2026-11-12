@@ -47,7 +47,7 @@ export function createApp(options: AppOptions) {
     if (!roles.includes(account.role)) { reply.code(403).send({ error: 'Недостаточно прав' }); return null; }
     return account;
   }
-  app.get('/api/health', async () => ({ status: 'ok', service: 'navikultura-api', phase: 'stage-03' }));
+  app.get('/api/health', async () => ({ status: 'ok', service: 'navikultura-api', phase: 'stage-01' }));
   app.get('/api/public/navigation', async () => ({
     status: 'demo', sections: [
       { id: 'posters', title: 'Афиша' }, { id: 'schedule', title: 'Расписание' },
