@@ -7,8 +7,9 @@ import { validateScheduleFields, type ScheduleRepository } from './schedule.js';
 import {validateEvent,type EventsRepository} from './events.js';
 import {documentStream,type DocumentRepository} from './documents.js';
 import { defaultThemeSettings,isThemeId,THEME_NAMES, VISITOR_THEME_IDS,type ThemeRepository } from './themes.js';
+import {CultureMedia,defaultCultureState,validateCulture,type CultureRepository} from './culture.js';
 
-export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; events?: EventsRepository; documents?: DocumentRepository; cookieSecure?: boolean; allowedOrigin?: string }
+export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; events?: EventsRepository; documents?: DocumentRepository; culture?: CultureRepository; cultureMedia?: CultureMedia; cookieSecure?: boolean; allowedOrigin?: string }
 const MAX_AGE_S = 8 * 60 * 60;
 const ID = /^[a-z0-9_-]{1,80}$/i;
 const cookieName = (secure: boolean) => secure ? '__Host-navikultura_sid' : 'navikultura_dev_sid';
@@ -24,7 +25,7 @@ function userPublic(account: Account) {
 }
 export function createApp(options: AppOptions) {
   const app = Fastify({ logger: false, bodyLimit: 11_000_000 });
-  const { store, posters, schedule, themes, events, documents, cookieSecure = false, allowedOrigin } = options;
+  const { store, posters, schedule, themes, events, documents, culture, cultureMedia, cookieSecure = false, allowedOrigin } = options;
   const failedLogins = new Map<string, { count: number; windowStart: number }>();
   const mutating = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
   app.addHook('onRequest', async (request, reply) => {
@@ -55,12 +56,65 @@ export function createApp(options: AppOptions) {
     status: 'demo', sections: [
       { id: 'posters', title: 'Афиша' }, { id: 'schedule', title: 'Расписание' },
       { id: 'groups', title: 'Коллективы' }, {id:'calendar',title:'Календарь событий'}, {id:'documents',title:'Документы ДК'}, { id: 'navigation', title: 'Навигация' },
-      { id: 'about', title: 'О ДК' }, { id: 'contacts', title: 'Контакты' },
+      { id: 'about', title: 'О ДК' }, { id: 'safety', title: 'Безопасность' }, { id: 'tickets', title: 'Билеты' }, { id: 'contacts', title: 'Контакты' },
     ],
   }));
   app.get('/api/public/schedule', async (_request, reply) => {
     reply.header('Cache-Control', 'no-store');
     return schedule ? await schedule.list() : { entries: [], version:'none', updatedAt:null, stale:false, message:'Расписание ещё не настроено' };
+  });
+  // Cultural content: seeded preview, protected drafts, explicit publication.
+  app.get('/api/public/culture',async(_request,reply)=>{
+    reply.header('Cache-Control','no-store');
+    const state=culture?await culture.get():defaultCultureState();
+    return {content:state.published,revision:state.publishedRevision};
+  });
+  app.get('/api/editor/culture',async(request,reply)=>{
+    const user=await requireRole(request,reply,['admin','editor','viewer']);if(!user)return;
+    reply.header('Cache-Control','no-store');
+    return {state:culture?await culture.get():defaultCultureState()};
+  });
+  app.patch<{Body:{content?:unknown;expectedRevision?:number}}>('/api/editor/culture',async(request,reply)=>{
+    const user=await requireRole(request,reply,['admin','editor']);if(!user)return;
+    if(!culture)return reply.code(503).send({error:'Редактор культурного контента недоступен'});
+    const expected=Number(request.body?.expectedRevision);
+    if(!Number.isSafeInteger(expected)||expected<1)return reply.code(400).send({error:'Неверная версия'});
+    let value;try{value=validateCulture(request.body?.content);}
+    catch(error){return reply.code(400).send({error:error instanceof Error?error.message:'Неверные поля'});}
+    const state=await culture.update(value,expected);
+    if(!state)return reply.code(409).send({error:'Контент изменён другим сотрудником. Обновите данные'});
+    await store.audit(user.id,'culture.save',{revision:state.revision});
+    return {state};
+  });
+  app.post<{Body:{expectedRevision?:number}}>('/api/editor/culture/publish',async(request,reply)=>{
+    const user=await requireRole(request,reply,['admin']);if(!user)return;
+    if(!culture)return reply.code(503).send({error:'Публикация недоступна'});
+    const expected=Number(request.body?.expectedRevision);
+    if(!Number.isSafeInteger(expected)||expected<1)return reply.code(400).send({error:'Неверная версия'});
+    const state=await culture.publish(expected);
+    if(!state)return reply.code(409).send({error:'Контент изменён другим сотрудником'});
+    await store.audit(user.id,'culture.publish',{revision:state.publishedRevision});
+    return {state};
+  });
+  app.post<{Body:{fileName?:string;base64?:string}}>('/api/editor/culture/photo',
+    async(request,reply)=>{
+      const user=await requireRole(request,reply,['admin','editor']);if(!user)return;
+      if(!cultureMedia)return reply.code(503).send({error:'Загрузка фото недоступна'});
+      const {fileName,base64}=request.body??{};
+      if(typeof fileName!=='string'||typeof base64!=='string')return reply.code(400).send({error:'Требуется фото'});
+      try{
+        const url=await cultureMedia.upload(fileName,base64);
+        await store.audit(user.id,'culture.photo',{uploaded:true});
+        return reply.code(201).send({url});
+      }catch(error){return reply.code(400).send({error:error instanceof Error?error.message:'Недопустимое фото'});}
+    });
+  app.get<{Params:{name:string}}>('/api/public/culture/media/:name',async(request,reply)=>{
+    const result=await cultureMedia?.file(request.params.name);
+    if(!result)return reply.code(404).send({error:'Фото не найдено'});
+    reply.header('Cache-Control','public, max-age=3600');
+    reply.header('Content-Type',result.mime);
+    reply.header('X-Content-Type-Options','nosniff');
+    return reply.send(result.stream);
   });
   // Calendar data is independently reviewed: no draft details are exposed to visitors.
   app.get('/api/public/events',async(_request,reply)=>{
