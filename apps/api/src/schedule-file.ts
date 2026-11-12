@@ -28,8 +28,9 @@ export class FileScheduleRepository implements ScheduleRepository {
           !row.updated_at || (row.published !== null && typeof row.published !== 'object')) {
           throw new Error('Файл расписания содержит ошибочную запись');
         }
-        validateScheduleFields(row);
-        if (row.published) validateScheduleFields(row.published);
+        // In-memory migration: older records are readable without modifying disk on a GET.
+        Object.assign(row,validateScheduleFields(row));
+        if (row.published) row.published=validateScheduleFields(row.published);
       }
       this.lastGood = structuredClone(records); this.hasGood = true;
       return records;
