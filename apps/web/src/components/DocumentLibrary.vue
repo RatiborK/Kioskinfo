@@ -24,8 +24,12 @@ async function openDocument(id:string){
   }catch(e){error.value=e instanceof Error?e.message:String(e);}finally{busy.value=false;}
 }
 function back(){selectedId.value='';html.value='';error.value='';}
-watch(()=>props.initialId,id=>{if(id)void openDocument(id);},{immediate:true});
-watch(()=>props.documents,docs=>{if(selectedId.value&&!docs.some(d=>d.id===selectedId.value))back();});
+watch(()=>props.initialId,id=>{if(id&&props.documents.some(d=>d.id===id))void openDocument(id);},{immediate:true});
+watch(()=>props.documents,docs=>{
+  if(!selectedId.value)return;
+  if(docs.some(d=>d.id===selectedId.value)){if(selected.value?.format==='docx'&&!html.value&&!busy.value)void openDocument(selectedId.value);}
+  else if(docs.length)back();
+});
 </script>
 <template>
   <section class="documents-visitor" aria-label="Документы Дворца культуры">
