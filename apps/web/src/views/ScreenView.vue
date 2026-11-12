@@ -4,6 +4,9 @@ import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import {useRoute} from 'vue-router';
 import EventCalendar from '../components/EventCalendar.vue';
 import DocumentLibrary from '../components/DocumentLibrary.vue';
+import CollectivesDirectory from '../components/CollectivesDirectory.vue';
+import CultureLanding from '../components/CultureLanding.vue';
+import type {CultureContent} from '../utils/culture-types.js';
 import type {PublicEvent,PublicDocument as Document} from '../utils/content-types.js';
 import KioskKeyboard from '../components/KioskKeyboard.vue';
 import {filterSchedule} from '../utils/kiosk-search.js';
@@ -17,6 +20,8 @@ const items = [
   { id: 'documents', label: 'Документы ДК', icon: '▤' },
   { id: 'navigation', label: 'Навигация', icon: '⌖' },
   { id: 'about', label: 'О ДК', icon: '▣' },
+  { id: 'safety', label: 'Безопасность', icon: '◇' },
+  { id: 'tickets', label: 'Билеты', icon: '◈' },
   { id: 'contacts', label: 'Контакты', icon: '↗' },
 ] as const;
 const route=useRoute();
@@ -25,6 +30,13 @@ const current = ref<(typeof items)[number]['id']>(
   items.some(item=>item.id===initialSection)?initialSection as (typeof items)[number]['id']:'posters');
 const events=ref<PublicEvent[]>([]);
 const documents=ref<Document[]>([]);
+const culture=ref<CultureContent|null>(null);
+const directoryRef=ref<{toggleSearch:()=>void}|null>(null);
+async function reloadCulture(){
+  try{const response=await fetch('/api/public/culture',{cache:'no-store'});
+    if(response.ok){const data:{content:CultureContent}=await response.json();culture.value=data.content;}
+  }catch{/* Last published content remains on screen during temporary connection errors. */}
+}
 const initialDocumentId=typeof route.query.document==='string'?route.query.document:'';
 async function reloadEvents(){
   try{const r=await fetch('/api/public/events',{cache:'no-store'});
@@ -102,6 +114,7 @@ function focusSchedulePanel(){
   }
 }
 function focusCurrentPage(){
+  document.querySelector<HTMLElement>('.screen-content')?.scrollTo({top:0,behavior:'instant'});
   if(searchOpen.value && (current.value==='schedule'||current.value==='groups')){
     focusSearchInput();return;
   }
@@ -109,7 +122,8 @@ function focusCurrentPage(){
 }
 function toggleSearch(){
   noteActivity();
-  if(current.value!=='schedule'&&current.value!=='groups'){
+  if(current.value==='groups'){directoryRef.value?.toggleSearch();return;}
+  if(current.value!=='schedule'){
     selectedScheduleId.value=null;
     keyboardOpen.value=false;
     searchQuery.value='';
@@ -153,8 +167,8 @@ const activePoster=computed(()=>posters.value[posterIndex.value]);
 const posterThumbs=computed(()=>visiblePosterWindow(posters.value,posterIndex.value,6));
 function selectPoster(index:number){lastManualPosterInput=Date.now();noteActivity();posterIndex.value=index;}
 onMounted(async () => {
-  await Promise.all([reloadPosters(),reloadSchedule(),reloadVisitorTheme(),reloadEvents(),reloadDocuments()]);
-  reloadHandle=setInterval(()=>{void reloadPosters();void reloadSchedule();void reloadVisitorTheme();void reloadEvents();void reloadDocuments();},10000);
+  await Promise.all([reloadPosters(),reloadSchedule(),reloadVisitorTheme(),reloadEvents(),reloadDocuments(),reloadCulture()]);
+  reloadHandle=setInterval(()=>{void reloadPosters();void reloadSchedule();void reloadVisitorTheme();void reloadEvents();void reloadDocuments();void reloadCulture();},10000);
   slideshowHandle=setInterval(()=>{if(activePoster.value?.kind!=='video' && Date.now()-lastManualPosterInput>=12000)movePoster(1,false);},8000);
   idleHandle=setInterval(resetIfIdle,12000);
   window.addEventListener('pointerdown',noteActivity,{passive:true});
@@ -187,7 +201,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
             <circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/>
           </svg>
         </button>
-        <span class="stage-note">АФИША · ПОДКЛЮЧЕНА</span>
+        <span class="stage-note">ДК «КИРОВСКИЙ» · КРАСНОЯРСК</span>
       </header>
       <section v-if="current==='posters'" class="poster-gallery" aria-label="Актуальные афиши">
         <div class="poster-heading"><span class="hero-overline">ПРОГРАММА МЕРОПРИЯТИЙ</span><h1 data-page-title tabindex="-1">Афиша<span class="dot">.</span></h1></div>
@@ -214,8 +228,8 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         <div v-if="!activePoster" class="poster-empty"><strong>Афиши появятся здесь автоматически</strong><p>Сотрудники могут добавить JPG, PNG или WebP через редактор или папку на сервере.</p></div>
         <p v-if="posterError" class="poster-warning" role="status">{{posterError}}</p>
       </section>
-      <section v-else-if="current==='schedule'||current==='groups'" class="schedule-section" aria-live="polite">
-        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1 data-page-title tabindex="-1">{{current==='groups'?'Коллективы':'Расписание'}}<span class="dot">.</span></h1></div>
+      <section v-else-if="current==='schedule'" class="schedule-section" aria-live="polite">
+        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1 data-page-title tabindex="-1">Расписание<span class="dot">.</span></h1></div>
         <Transition name="kiosk-detail" mode="out-in" @after-enter="focusSchedulePanel">
           <div v-if="selectedSchedule" :key="'detail:'+selectedSchedule.id" class="schedule-detail-layout">
           <button type="button" class="schedule-back" @click="backToSchedule">← Все направления</button>
@@ -268,6 +282,23 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
           </div>
         </Transition>
         <p v-if="scheduleStatus" class="poster-warning" role="status">{{scheduleStatus}}</p>
+      </section>
+      <section v-else-if="current==='groups'" class="schedule-section culture-directory-page" aria-live="polite">
+        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ТВОРЧЕСКАЯ ЖИЗНЬ</span>
+          <h1 data-page-title tabindex="-1">Коллективы<span class="dot">.</span></h1></div>
+        <CollectivesDirectory v-if="culture" ref="directoryRef" :content="culture"/>
+      </section>
+      <section v-else-if="current==='safety'" class="culture-section" aria-live="polite">
+        <CultureLanding v-if="culture" :content="culture" mode="safety"/>
+      </section>
+      <section v-else-if="current==='tickets'" class="culture-section" aria-live="polite">
+        <CultureLanding v-if="culture" :content="culture" mode="tickets"/>
+      </section>
+      <section v-else-if="current==='about'" class="culture-section" aria-live="polite">
+        <CultureLanding v-if="culture" :content="culture" mode="about"/>
+      </section>
+      <section v-else-if="current==='contacts'" class="culture-section" aria-live="polite">
+        <CultureLanding v-if="culture" :content="culture" mode="contacts"/>
       </section>
       <section v-else-if="current==='calendar'" class="schedule-section visitor-calendar-page" aria-live="polite">
         <div class="schedule-header"><span class="hero-overline">КУЛЬТУРНАЯ АФИША · ПО ДАТАМ</span>

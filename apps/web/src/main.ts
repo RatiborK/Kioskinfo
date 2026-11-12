@@ -8,6 +8,7 @@ import './styles.css';
 import './visitor-themes.css';
 import './kiosk-motion.css';
 import './cultural-content.css';
+import './culture-pages.css';
 
 const router = createRouter({
   history: createWebHistory(),
