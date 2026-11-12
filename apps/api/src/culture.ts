@@ -29,7 +29,6 @@ export interface CultureRepository{
 }
 const MAX_BYTES=900000;
 const MAX_PHOTO_BYTES=3*1024*1024;
-const uuid=/^[0-9a-f-]{36}$/;
 const imageName=/^[0-9a-f-]{36}\.(png|jpg|webp)$/;
 export const cultureFile=()=>fileURLToPath(new URL('../../../content/culture/catalog.json',import.meta.url));
 export const cultureImagesDir=()=>fileURLToPath(new URL('../../../content/culture/images',import.meta.url));
@@ -178,20 +177,29 @@ export class FileCultureRepository implements CultureRepository{
 }
 export class PgCultureRepository implements CultureRepository{
   constructor(private readonly pool:pg.Pool){}
+  private async ensure(){
+    await this.pool.query(
+      'INSERT INTO culture_content(id,draft,published) VALUES(1,$1::jsonb,$1::jsonb) ON CONFLICT(id) DO NOTHING',
+      [JSON.stringify(starterContent)]
+    );
+  }
   private map(row:Record<string,unknown>):CultureState{
     return normalizeState({revision:row.revision,publishedRevision:row.published_revision,
       draft:row.draft,published:row.published,updatedAt:new Date(row.updated_at as Date|string).toISOString()});
   }
   async get(){
+    await this.ensure();
     const row=(await this.pool.query('SELECT revision,published_revision,draft,published,updated_at FROM culture_content WHERE id=1')).rows[0];
     if(!row)throw Error('Нужна миграция 005_culture_content.sql');return this.map(row);
   }
   async update(content:CultureContent,revision:number){
+    await this.ensure();
     const r=await this.pool.query('UPDATE culture_content SET draft=$1::jsonb,revision=revision+1,updated_at=now() WHERE id=1 AND revision=$2 RETURNING revision,published_revision,draft,published,updated_at',
       [JSON.stringify(validateCulture(content)),revision]);
     return r.rows[0]?this.map(r.rows[0]):null;
   }
   async publish(revision:number){
+    await this.ensure();
     const r=await this.pool.query('UPDATE culture_content SET published=draft,published_revision=revision,updated_at=now() WHERE id=1 AND revision=$1 RETURNING revision,published_revision,draft,published,updated_at',[revision]);
     return r.rows[0]?this.map(r.rows[0]):null;
   }
