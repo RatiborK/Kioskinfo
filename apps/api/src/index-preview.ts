@@ -4,6 +4,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { createApp } from './app.js';
 import { FolderPosterRepository } from './posters.js';
 import { FileScheduleRepository } from './schedule-file.js';
+import {seedPreviewSchedule} from './seed-preview-schedule.js';
 import { FileThemeRepository } from './themes.js';
 import { FileEventsRepository } from './events.js';
 import { FolderDocumentsRepository } from './documents.js';
@@ -34,12 +35,14 @@ class LocalDevStore implements Store {
 const password=process.env.NAVIKULTURA_DEV_PASSWORD || randomBytes(18).toString('base64url');
 if(password.length<12)throw new Error('NAVIKULTURA_DEV_PASSWORD: требуется не менее 12 символов');
 const store=new LocalDevStore(await hashPassword(password));
-const app=createApp({store,posters:new FolderPosterRepository(),schedule:new FileScheduleRepository(),themes:new FileThemeRepository(),events:new FileEventsRepository(),documents:new FolderDocumentsRepository(),culture:new FileCultureRepository(),cultureMedia:new CultureMedia(),allowedOrigin:'http://127.0.0.1:5173'});
+const scheduleRepo=new FileScheduleRepository();
+const importedCards=await seedPreviewSchedule(scheduleRepo);
+const app=createApp({store,posters:new FolderPosterRepository(),schedule:scheduleRepo,themes:new FileThemeRepository(),events:new FileEventsRepository(),documents:new FolderDocumentsRepository(),culture:new FileCultureRepository(),cultureMedia:new CultureMedia(),allowedOrigin:'http://127.0.0.1:5173'});
 try {
   await app.listen({host:'127.0.0.1',port:3100});
   process.stdout.write('\n[LOCAL DEV ONLY] НавиКультура: http://127.0.0.1:5173/editor\n');
   process.stdout.write('Логин: admin\nПароль для текущего запуска: '+password+'\n');
-  process.stdout.write('Данные расписания: content/schedule/records.json. Этот режим НЕ для локальной сети ДК.\n\n');
+  process.stdout.write('Каталог расписания: content/schedule/records.json. Добавлено начальных карточек: '+importedCards+'. Этот режим НЕ для локальной сети ДК.\n\n');
 } catch(error) {
   const detail = error instanceof Error ? error.message : String(error);
   process.stderr.write('[NAVIKULTURA DEV] Не удалось запустить API на 127.0.0.1:3100: ' + detail + '\n');
