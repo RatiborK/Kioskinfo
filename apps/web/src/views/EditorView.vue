@@ -60,7 +60,6 @@ const username = ref(''); const password = ref('');
 const pages = ref<Page[]>([]); const selectedId = ref('');
 const title = ref(''); const body = ref(''); const revision = ref(0);
 const status = ref('Подключение…'); const busy = ref(false); const error = ref('');
-let timer:ReturnType<typeof setTimeout>|undefined;
 let changed = false;
 const headers = {'Content-Type':'application/json','X-Navikultura-Action':'1'};
 async function api(path:string, init:RequestInit={}) {
@@ -70,7 +69,7 @@ async function api(path:string, init:RequestInit={}) {
   return json;
 }
 function usePage(page:Page) {
-  if(timer) clearTimeout(timer); changed=false;
+  changed=false;
   selectedId.value=page.id; title.value=page.title; body.value=page.body; revision.value=page.revision;
   status.value='Изменений нет'; error.value='';
 }
@@ -104,14 +103,12 @@ async function logout(){
   if(busy.value)return;
   if(changed){await save();if(changed)return;}
   if(scheduleEditor.value && !(await scheduleEditor.value.flush()))return;
-  if(timer)clearTimeout(timer);
   try{await api('/api/auth/logout',{method:'POST',headers,body:'{}'});}finally{user.value=null;pages.value=[];selectedId.value='';}
 }
 function changedField(){
   if(!user.value||user.value.role==='viewer')return;
   changed=true;status.value='Ожидает сохранения…';
-  if(timer)clearTimeout(timer);
-  timer=setTimeout(()=>void save(),800);
+
 }
 async function save(){
   if(!changed||busy.value||!selectedId.value)return;
@@ -123,7 +120,7 @@ async function save(){
     revision.value=data.page.revision;
     const index=pages.value.findIndex(p=>p.id===selectedId.value);
     if(index>=0)pages.value[index]=data.page;
-    if(changed){status.value='Есть новые изменения';timer=setTimeout(()=>void save(),500);}
+    if(changed){status.value='Есть новые изменения — сохраните после редактирования';}
     else status.value='Сохранено · версия '+revision.value;
   }catch(e){
     changed=true;
@@ -158,9 +155,25 @@ async function handleTabKeydown(event:KeyboardEvent){
   const target=tabs[next];
   if(target&&await changeTab(target.id))document.getElementById('editor-tab-'+target.id)?.focus();
 }
+// Only the unauthenticated login screen times out. An authenticated editor is never redirected.
+let loginLastActivity=Date.now();
+let loginIdleTimer:ReturnType<typeof setInterval>|undefined;
+function loginActivity(){if(!user.value)loginLastActivity=Date.now();}
+function loginIdleCheck(){if(!user.value && Date.now()-loginLastActivity>=180000)void router.replace('/screen');}
 function warnOnLeave(event:BeforeUnloadEvent){if(changed||busy.value){event.preventDefault();event.returnValue='';}}
-onMounted(()=>{window.addEventListener('beforeunload',warnOnLeave);void refreshSession();});
-onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('beforeunload',warnOnLeave);});
+onMounted(()=>{
+  window.addEventListener('beforeunload',warnOnLeave);
+  window.addEventListener('pointerdown',loginActivity,{passive:true});
+  window.addEventListener('keydown',loginActivity);
+  loginIdleTimer=setInterval(loginIdleCheck,10000);
+  void refreshSession();
+});
+onBeforeUnmount(()=>{
+  window.removeEventListener('beforeunload',warnOnLeave);
+  window.removeEventListener('pointerdown',loginActivity);
+  window.removeEventListener('keydown',loginActivity);
+  if(loginIdleTimer)clearInterval(loginIdleTimer);
+});
 </script>
 <template>
   <main class="editor-shell">
@@ -214,10 +227,10 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
       <aside class="editor-page-list"><h2>Страницы</h2><button v-for="page in pages" :key="page.id" class="editor-page-link" :class="{'current':page.id===selectedId}" @click="selectPage(page)">{{page.title}}</button></aside>
       <section class="editor-panel">
         <h2>Содержимое страницы</h2>
-        <p class="editor-hint">Изменения сохраняются автоматически через 0,8 секунды после ввода. Публикация — отдельное действие.</p>
+        <p class="editor-hint">Изменения сохраняются после выхода из поля или по кнопке. Публикация — отдельное действие.</p>
         <form v-if="selectedId" @submit.prevent="save">
-          <label>Название<input v-model="title" :disabled="user.role==='viewer'" maxlength="140" @input="changedField" /></label>
-          <label>Текст<textarea v-model="body" :disabled="user.role==='viewer'" rows="9" maxlength="100000" @input="changedField"></textarea></label>
+          <label>Название<input v-model="title" :disabled="user.role==='viewer'" maxlength="140" @input="changedField" @blur="save" /></label>
+          <label>Текст<textarea v-model="body" :disabled="user.role==='viewer'" rows="9" maxlength="100000" @input="changedField" @blur="save"></textarea></label>
           <div class="editor-actions">
             <button class="primary-button" type="button" :disabled="busy||user.role==='viewer'" @click="save">Сохранить сейчас</button>
             <button v-if="user.role==='admin'" class="secondary-button" type="button" :disabled="busy" @click="publish">Опубликовать</button>
