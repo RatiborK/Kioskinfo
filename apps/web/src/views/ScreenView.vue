@@ -3,6 +3,7 @@
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import KioskKeyboard from '../components/KioskKeyboard.vue';
 import {filterSchedule} from '../utils/kiosk-search.js';
+import {visiblePosterWindow,shouldReturnHome} from '../utils/kiosk-behavior.js';
 
 const items = [
   { id: 'posters', label: 'Афиша', icon: '✦' },
@@ -62,7 +63,7 @@ function changeSection(section:(typeof items)[number]['id']){
 function openSchedule(id:string){noteActivity();keyboardOpen.value=false;selectedScheduleId.value=id;}
 function backToSchedule(){noteActivity();selectedScheduleId.value=null;}
 function resetIfIdle(){
-  if(Date.now()-lastActivity<IDLE_RETURN_MS)return;
+  if(!shouldReturnHome(lastActivity,Date.now(),IDLE_RETURN_MS))return;
   if(current.value!=='posters'||selectedScheduleId.value||keyboardOpen.value||searchQuery.value){
     current.value='posters';selectedScheduleId.value=null;keyboardOpen.value=false;searchQuery.value='';
     posterIndex.value=0;
@@ -85,11 +86,7 @@ function movePoster(direction:1|-1,manual=true){
   if(posters.value.length)posterIndex.value=(posterIndex.value+posters.value.length+direction)%posters.value.length;
 }
 const activePoster=computed(()=>posters.value[posterIndex.value]);
-const posterThumbs=computed(()=>{
-  const len=posters.value.length;
-  const start=Math.max(0,Math.min(posterIndex.value-2,len-6));
-  return posters.value.slice(start,start+6).map((poster,index)=>({poster,index:start+index}));
-});
+const posterThumbs=computed(()=>visiblePosterWindow(posters.value,posterIndex.value,6));
 function selectPoster(index:number){lastManualPosterInput=Date.now();noteActivity();posterIndex.value=index;}
 onMounted(async () => {
   await Promise.all([reloadPosters(),reloadSchedule(),reloadVisitorTheme()]);
