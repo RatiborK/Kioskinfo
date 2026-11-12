@@ -8,6 +8,11 @@ const state=ref<CultureState|null>(null),draft=ref<CultureContent|null>(null);
 const selectedPanel=ref<'clubs'|'leaders'|'about'|'safety'|'tickets'|'contacts'>('clubs');
 const groupId=ref(''),leaderId=ref('');
 const busy=ref(false),dirty=ref(false),message=ref('Загрузка материалов…'),error=ref('');
+const panels=[
+  {id:'clubs',name:'Коллективы'},{id:'leaders',name:'Руководители'},
+  {id:'about',name:'О ДК'},{id:'safety',name:'Безопасность'},
+  {id:'tickets',name:'Билеты'},{id:'contacts',name:'Контакты'},
+] as const;
 const canEdit=computed(()=>props.role==='admin'||props.role==='editor');
 const group=computed(()=>draft.value?.collectives.find(x=>x.id===groupId.value)??null);
 const leader=computed(()=>draft.value?.leaders.find(x=>x.id===leaderId.value)??null);
@@ -130,12 +135,8 @@ onMounted(()=>{void load();});
     </div>
     <p role="status" class="status-line">{{message}}</p><p v-if="error" class="editor-error" role="alert">{{error}}</p>
     <nav class="culture-editor-tabs" aria-label="Состав материалов">
-      <button v-for="tab in [
-        {id:'clubs',name:'Коллективы'},{id:'leaders',name:'Руководители'},
-        {id:'about',name:'О ДК'},{id:'safety',name:'Безопасность'},
-        {id:'tickets',name:'Билеты'},{id:'contacts',name:'Контакты'}
-      ]" :key="tab.id" type="button" :class="{active:selectedPanel===tab.id}"
-        @click="selectPanel(tab.id as typeof selectedPanel)">{{tab.name}}</button>
+      <button v-for="tab in panels" :key="tab.id" type="button" :class="{active:selectedPanel===tab.id}"
+        @click="selectPanel(tab.id)">{{tab.name}}</button>
     </nav>
     <div v-if="draft" class="culture-edit-body">
       <section v-if="selectedPanel==='clubs'" class="culture-editor-columns">
