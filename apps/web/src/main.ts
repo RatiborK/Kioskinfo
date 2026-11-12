@@ -6,6 +6,7 @@ import ScreenView from './views/ScreenView.vue';
 import EditorView from './views/EditorView.vue';
 import './styles.css';
 import './visitor-themes.css';
+import './kiosk-motion.css';
 
 const router = createRouter({
   history: createWebHistory(),
