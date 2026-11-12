@@ -129,7 +129,7 @@ export function createApp(options: AppOptions) {
     return { page };
   });
   app.setErrorHandler((error, request, reply) => {
-    if (error.statusCode && error.statusCode < 500) return reply.code(error.statusCode).send({ error: error.message });
+    if (error instanceof Error && 'statusCode' in error && typeof error.statusCode === 'number' && error.statusCode >= 400 && error.statusCode < 500) return reply.code(error.statusCode).send({ error: error.message });
     request.log.error({ error }, 'server error');
     return reply.code(500).send({ error: 'Внутренняя ошибка. Обратитесь к администратору' });
   });
