@@ -1,6 +1,10 @@
 <!-- apps/web/src/views/ScreenView.vue — themed touchscreen interface with live posters and searchable schedule. -->
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
+import {useRoute} from 'vue-router';
+import EventCalendar from '../components/EventCalendar.vue';
+import DocumentLibrary from '../components/DocumentLibrary.vue';
+import type {PublicEvent,PublicDocument as Document} from '../utils/content-types.js';
 import KioskKeyboard from '../components/KioskKeyboard.vue';
 import {filterSchedule} from '../utils/kiosk-search.js';
 import {visiblePosterWindow,shouldReturnHome} from '../utils/kiosk-behavior.js';
@@ -9,11 +13,29 @@ const items = [
   { id: 'posters', label: 'Афиша', icon: '✦' },
   { id: 'schedule', label: 'Расписание', icon: '◷' },
   { id: 'groups', label: 'Коллективы', icon: '◎' },
+  { id: 'calendar', label: 'Календарь событий', icon: '▦' },
+  { id: 'documents', label: 'Документы ДК', icon: '▤' },
   { id: 'navigation', label: 'Навигация', icon: '⌖' },
   { id: 'about', label: 'О ДК', icon: '▣' },
   { id: 'contacts', label: 'Контакты', icon: '↗' },
 ] as const;
-const current = ref<(typeof items)[number]['id']>('posters');
+const route=useRoute();
+const initialSection=route.query.section;
+const current = ref<(typeof items)[number]['id']>(
+  items.some(item=>item.id===initialSection)?initialSection as (typeof items)[number]['id']:'posters');
+const events=ref<PublicEvent[]>([]);
+const documents=ref<Document[]>([]);
+const initialDocumentId=typeof route.query.document==='string'?route.query.document:'';
+async function reloadEvents(){
+  try{const r=await fetch('/api/public/events',{cache:'no-store'});
+    if(r.ok){const data:{events:PublicEvent[]}=await r.json();events.value=data.events;}
+  }catch{/* The last received published calendar remains visible while offline. */}
+}
+async function reloadDocuments(){
+  try{const r=await fetch('/api/public/documents',{cache:'no-store'});
+    if(r.ok){const data:{documents:Document[]}=await r.json();documents.value=data.documents;}
+  }catch{/* Do not hide already received documents on a transient network failure. */}
+}
 const welcome = ref<{ title:string; body:string } | null>(null);
 type VisitorTheme='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
 const visitorTheme=ref<VisitorTheme>('dk');
@@ -131,8 +153,8 @@ const activePoster=computed(()=>posters.value[posterIndex.value]);
 const posterThumbs=computed(()=>visiblePosterWindow(posters.value,posterIndex.value,6));
 function selectPoster(index:number){lastManualPosterInput=Date.now();noteActivity();posterIndex.value=index;}
 onMounted(async () => {
-  await Promise.all([reloadPosters(),reloadSchedule(),reloadVisitorTheme()]);
-  reloadHandle=setInterval(()=>{void reloadPosters();void reloadSchedule();void reloadVisitorTheme();},10000);
+  await Promise.all([reloadPosters(),reloadSchedule(),reloadVisitorTheme(),reloadEvents(),reloadDocuments()]);
+  reloadHandle=setInterval(()=>{void reloadPosters();void reloadSchedule();void reloadVisitorTheme();void reloadEvents();void reloadDocuments();},10000);
   slideshowHandle=setInterval(()=>{if(activePoster.value?.kind!=='video' && Date.now()-lastManualPosterInput>=12000)movePoster(1,false);},8000);
   idleHandle=setInterval(resetIfIdle,12000);
   window.addEventListener('pointerdown',noteActivity,{passive:true});
@@ -247,6 +269,16 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         </Transition>
         <p v-if="scheduleStatus" class="poster-warning" role="status">{{scheduleStatus}}</p>
       </section>
+      <section v-else-if="current==='calendar'" class="schedule-section visitor-calendar-page" aria-live="polite">
+        <div class="schedule-header"><span class="hero-overline">КУЛЬТУРНАЯ АФИША · ПО ДАТАМ</span>
+          <h1 data-page-title tabindex="-1">Календарь событий<span class="dot">.</span></h1></div>
+        <EventCalendar :events="events"/>
+      </section>
+      <section v-else-if="current==='documents'" class="schedule-section visitor-documents-page" aria-live="polite">
+        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ОФИЦИАЛЬНАЯ ИНФОРМАЦИЯ</span>
+          <h1 data-page-title tabindex="-1">Документы<span class="dot">.</span></h1></div>
+        <DocumentLibrary :documents="documents" :initial-id="initialDocumentId"/>
+      </section>
       <section v-else class="hero" aria-live="polite">
         <div class="hero-overline"><i></i> ИНФОРМАЦИОННАЯ ПЛАТФОРМА</div>
         <h1 data-page-title tabindex="-1">{{ selected.label }}<span class="dot">.</span></h1>
@@ -266,6 +298,12 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
       <button v-for="(item,index) in items" :key="item.id" type="button" class="nav-item" :class="{active:current===item.id}" :aria-current="current===item.id?'page':undefined" @click="changeSection(item.id)">
         <span class="nav-index">{{ String(index+1).padStart(2,'0') }}</span><span class="nav-label">{{ item.label }}</span><span class="nav-glyph" aria-hidden="true">{{ item.icon }}</span>
       </button>
+      <a class="kiosk-admin-shortcut" href="/editor" title="Открыть вход в административную панель" aria-label="Вход в административную панель">
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+          stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
+        </svg><span>Вход в админку</span>
+      </a>
       <div class="menu-bottom">NAVIKULTURA / 2026</div>
     </nav>
   </main>

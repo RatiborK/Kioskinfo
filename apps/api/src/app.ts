@@ -4,9 +4,11 @@ import { createSessionToken, tokenHash, verifyPassword } from './crypto.js';
 import type { Account, PublicContent, Store } from './model.js';
 import { posterFileStream, type PosterRepository } from './posters.js';
 import { validateScheduleFields, type ScheduleRepository } from './schedule.js';
+import {validateEvent,type EventsRepository} from './events.js';
+import {documentStream,type DocumentRepository} from './documents.js';
 import { defaultThemeSettings,isThemeId,THEME_NAMES, VISITOR_THEME_IDS,type ThemeRepository } from './themes.js';
 
-export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; cookieSecure?: boolean; allowedOrigin?: string }
+export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; events?: EventsRepository; documents?: DocumentRepository; cookieSecure?: boolean; allowedOrigin?: string }
 const MAX_AGE_S = 8 * 60 * 60;
 const ID = /^[a-z0-9_-]{1,80}$/i;
 const cookieName = (secure: boolean) => secure ? '__Host-navikultura_sid' : 'navikultura_dev_sid';
@@ -22,7 +24,7 @@ function userPublic(account: Account) {
 }
 export function createApp(options: AppOptions) {
   const app = Fastify({ logger: false, bodyLimit: 11_000_000 });
-  const { store, posters, schedule, themes, cookieSecure = false, allowedOrigin } = options;
+  const { store, posters, schedule, themes, events, documents, cookieSecure = false, allowedOrigin } = options;
   const failedLogins = new Map<string, { count: number; windowStart: number }>();
   const mutating = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
   app.addHook('onRequest', async (request, reply) => {
@@ -52,13 +54,94 @@ export function createApp(options: AppOptions) {
   app.get('/api/public/navigation', async () => ({
     status: 'demo', sections: [
       { id: 'posters', title: 'Афиша' }, { id: 'schedule', title: 'Расписание' },
-      { id: 'groups', title: 'Коллективы' }, { id: 'navigation', title: 'Навигация' },
+      { id: 'groups', title: 'Коллективы' }, {id:'calendar',title:'Календарь событий'}, {id:'documents',title:'Документы ДК'}, { id: 'navigation', title: 'Навигация' },
       { id: 'about', title: 'О ДК' }, { id: 'contacts', title: 'Контакты' },
     ],
   }));
   app.get('/api/public/schedule', async (_request, reply) => {
     reply.header('Cache-Control', 'no-store');
     return schedule ? await schedule.list() : { entries: [], version:'none', updatedAt:null, stale:false, message:'Расписание ещё не настроено' };
+  });
+  // Calendar data is independently reviewed: no draft details are exposed to visitors.
+  app.get('/api/public/events',async(_request,reply)=>{
+    reply.header('Cache-Control','no-store');return {events:events?await events.list():[]};
+  });
+  app.get('/api/editor/events',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin','editor','viewer']);if(!account)return;
+    return {items:events?await events.drafts():[]};
+  });
+  app.post<{Body:{fields?:unknown}}>('/api/editor/events',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin','editor']);if(!account)return;
+    if(!events)return reply.code(503).send({error:'Календарь недоступен'});
+    let fields;try{fields=validateEvent(request.body?.fields);}catch(e){return reply.code(400).send({error:String(e instanceof Error?e.message:e)});}
+    const item=await events.create(fields);await store.audit(account.id,'events.create',{id:item.id});
+    return reply.code(201).send({item});
+  });
+  app.patch<{Params:{id:string};Body:{fields?:unknown;expectedRevision?:number}}>('/api/editor/events/:id',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin','editor']);if(!account)return;
+    if(!events)return reply.code(503).send({error:'Календарь недоступен'});
+    if(!ID.test(request.params.id)||!Number.isSafeInteger(request.body?.expectedRevision)||Number(request.body?.expectedRevision)<1)
+      return reply.code(400).send({error:'Неверный ID или версия мероприятия'});
+    let fields;try{fields=validateEvent(request.body?.fields);}catch(e){return reply.code(400).send({error:String(e instanceof Error?e.message:e)});}
+    const item=await events.save(request.params.id,Number(request.body.expectedRevision),fields);
+    if(!item)return reply.code(409).send({error:'Мероприятие уже изменено. Обновите список'});
+    await store.audit(account.id,'events.save',{id:item.id});return {item};
+  });
+  app.post<{Params:{id:string};Body:{expectedRevision?:number}}>('/api/editor/events/:id/publish',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin','editor']);if(!account)return;
+    if(!events)return reply.code(503).send({error:'Календарь недоступен'});
+    if(!ID.test(request.params.id)||!Number.isSafeInteger(request.body?.expectedRevision)||Number(request.body?.expectedRevision)<1)
+      return reply.code(400).send({error:'Неверный ID или версия мероприятия'});
+    const item=await events.publish(request.params.id,Number(request.body.expectedRevision));
+    if(!item)return reply.code(409).send({error:'Мероприятие уже изменено'});
+    await store.audit(account.id,'events.publish',{id:item.id});return {item};
+  });
+  app.delete<{Params:{id:string};Body:{expectedRevision?:number}}>('/api/editor/events/:id',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin']);if(!account)return;
+    if(!events)return reply.code(503).send({error:'Календарь недоступен'});
+    if(!ID.test(request.params.id)||!Number.isSafeInteger(request.body?.expectedRevision)||Number(request.body?.expectedRevision)<1)
+      return reply.code(400).send({error:'Неверный ID или версия'});
+    if(!await events.remove(request.params.id,Number(request.body.expectedRevision)))
+      return reply.code(409).send({error:'Мероприятие уже изменено'});
+    await store.audit(account.id,'events.remove',{id:request.params.id});return {status:'ok'};
+  });
+  // Public library: Word documents render as sanitised HTML; PDF is offered as an inline file.
+  app.get('/api/public/documents',async(_request,reply)=>{
+    reply.header('Cache-Control','no-store');return {documents:documents?await documents.list():[]};
+  });
+  app.get<{Params:{id:string}}>('/api/public/documents/:id/content',async(request,reply)=>{
+    if(!ID.test(request.params.id))return reply.code(404).send({error:'Документ не найден'});
+    const html=await documents?.html(request.params.id);
+    if(html==null)return reply.code(404).send({error:'Документ не найден'});
+    reply.header('Cache-Control','no-store');return {html};
+  });
+  app.get<{Params:{id:string}}>('/api/public/documents/:id/file',async(request,reply)=>{
+    if(!ID.test(request.params.id))return reply.code(404).send({error:'Документ не найден'});
+    const file=await documents?.file(request.params.id);
+    if(!file)return reply.code(404).send({error:'Документ не найден'});
+    reply.header('Content-Type',file.mime);reply.header('X-Content-Type-Options','nosniff');
+    reply.header('Cache-Control','no-store');reply.header('Content-Length',file.sizeBytes);
+    reply.header('Content-Disposition',file.mime==='application/pdf'?'inline; filename="document.pdf"':'attachment; filename="document.docx"');
+    return reply.send(documentStream(file.path));
+  });
+  app.post<{Body:{title?:string;category?:string;name?:string;base64?:string}}>('/api/editor/documents',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin','editor']);if(!account)return;
+    if(!documents)return reply.code(503).send({error:'Хранилище документов недоступно'});
+    const {title,category,name,base64}=request.body??{};
+    if(typeof title!=='string'||typeof category!=='string'||typeof name!=='string'||typeof base64!=='string')
+      return reply.code(400).send({error:'Заполните название, категорию и файл'});
+    try{
+      const doc=await documents.upload(title,category as import('./documents.js').DocumentCategory,name,base64);
+      await store.audit(account.id,'documents.upload',{id:doc.id,category:doc.category,size:doc.sizeBytes});
+      return reply.code(201).send({document:doc});
+    }catch(e){return reply.code(400).send({error:e instanceof Error?e.message:'Не удалось загрузить документ'});}
+  });
+  app.delete<{Params:{id:string}}>('/api/editor/documents/:id',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin']);if(!account)return;
+    if(!documents)return reply.code(503).send({error:'Хранилище документов недоступно'});
+    if(!ID.test(request.params.id))return reply.code(404).send({error:'Документ не найден'});
+    if(!await documents.remove(request.params.id))return reply.code(404).send({error:'Документ не найден'});
+    await store.audit(account.id,'documents.remove',{id:request.params.id});return {status:'ok'};
   });
   // Published design is independent from content; kiosks never receive a draft choice.
   app.get('/api/public/theme',async (_request,reply)=>{
