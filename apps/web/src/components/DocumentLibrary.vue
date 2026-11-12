@@ -1,8 +1,7 @@
 <!-- apps/web/src/components/DocumentLibrary.vue — visitor reading room for DK official documents. -->
 <script setup lang="ts">
 import {computed,ref,watch} from 'vue';
-export type Category='prices'|'policies'|'benefits'|'other';
-export type Document={id:string;title:string;category:Category;format:'pdf'|'docx';sizeBytes:number;createdAt:string};
+import type {DocumentCategory as Category,PublicDocument as Document} from '../utils/content-types.js';
 const props=defineProps<{documents:Document[];initialId?:string}>();
 const categories:{id:Category;title:string;caption:string;icon:string}[]=[
   {id:'prices',title:'Прейскурант',caption:'Стоимость услуг и занятий',icon:'₽'},
