@@ -1,0 +1,17 @@
+{
+  "name": "navikultura",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w @navikultura/api",
+    "dev:web": "npm run dev -w @navikultura/web",
+    "build": "npm run build --workspaces --if-present",
+    "check": "npm run typecheck --workspaces --if-present && npm run test --workspaces --if-present && npm run build --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=26 <27"
+  }
+}
