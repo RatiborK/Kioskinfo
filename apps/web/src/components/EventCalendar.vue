@@ -1,9 +1,7 @@
 <!-- apps/web/src/components/EventCalendar.vue — visitor-facing monthly events. -->
 <script setup lang="ts">
 import {computed,ref,watch} from 'vue';
-export type EventType='concert'|'play'|'festival'|'other';
-export type EventVenue='hall'|'foyer'|'orfey';
-export type PublicEvent={id:string;title:string;date:string;time:string;type:EventType;venue:EventVenue;description:string};
+import type {EventType,EventVenue,PublicEvent} from '../utils/content-types.js';
 const props=defineProps<{events:PublicEvent[]}>();
 const today=new Date();
 const month=ref(new Date(today.getFullYear(),today.getMonth(),1));
