@@ -30,3 +30,54 @@
 .poster-editor{grid-column:1/-1}.poster-editor-top{display:flex;justify-content:space-between;align-items:center;gap:16px}.poster-editor-top h2{margin:9px 0}.poster-upload{display:block!important;margin:18px 0;border:2px dashed #575757;background:#111;padding:19px;border-radius:6px}.poster-upload input{margin-top:12px;background:transparent!important}
 .poster-editor-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px}.poster-editor-row{display:flex;align-items:center;gap:12px;padding:10px;background:#202020;min-width:0}.poster-editor-row img,.poster-video-icon{width:70px;height:80px;object-fit:contain;background:#050505;display:grid;place-items:center}.poster-editor-name{flex:1;min-width:0;overflow-wrap:anywhere}.poster-editor-name small{display:block;color:var(--muted);font-size:12px;margin-top:7px}
 @media(max-width:780px){.poster-editor-top{align-items:flex-start;flex-direction:column}.poster-stage{min-height:50vh}.poster-heading{flex-wrap:wrap}}
+
+/* Stage 03: schedule cards from the authenticated web editor. */
+.schedule-section{padding:clamp(22px,3.5vw,52px) 0;flex:1;overflow:auto;z-index:1}
+.schedule-header h1{font-size:clamp(42px,6vw,90px);line-height:1.05;letter-spacing:-.065em;margin:15px 0 22px}
+.schedule-hint{color:var(--muted);font-size:17px;margin:0 0 24px}
+.schedule-buttons{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px;align-content:start}
+.schedule-button{position:relative;display:flex;flex-direction:column;align-items:flex-start;text-align:left;justify-content:space-between;gap:20px;min-height:150px;padding:23px 25px;background:#202022;color:#fff;border:1px solid var(--line);overflow:hidden}
+.schedule-button strong{font-size:clamp(20px,2vw,29px);font-weight:800;line-height:1.15;max-width:calc(100% - 25px);overflow-wrap:anywhere}
+.schedule-button span:not(.schedule-arrow){font-size:14px;opacity:.8;line-height:1.35}
+.schedule-button .schedule-arrow{position:absolute;right:16px;top:15px;font-size:23px}
+.schedule-button.theme-orange,.schedule-detail.theme-orange{border-color:var(--orange)}
+.schedule-button.theme-orange:hover,.schedule-button.theme-orange:focus-visible{background:var(--orange);color:#101010}
+.schedule-button.theme-blue,.schedule-detail.theme-blue{border-color:var(--blue)}
+.schedule-button.theme-blue:hover,.schedule-button.theme-blue:focus-visible{background:var(--blue)}
+.schedule-button.theme-neutral,.schedule-detail.theme-neutral{border-color:#787878}
+.schedule-button.theme-neutral:hover,.schedule-button.theme-neutral:focus-visible{background:#444}
+.schedule-back{background:transparent;border:1px solid var(--line);color:var(--warm);padding:12px 17px;margin-bottom:18px}
+.schedule-back:hover{border-color:var(--orange)}
+.schedule-detail{border:1px solid var(--line);background:#151515;padding:clamp(20px,3vw,38px);max-width:850px}
+.schedule-detail h2{font-size:clamp(29px,3vw,53px);margin:12px 0 26px;letter-spacing:-.04em;overflow-wrap:anywhere}
+.schedule-detail-rows{display:grid;gap:0}
+.schedule-detail-rows p{display:grid;grid-template-columns:160px minmax(0,1fr);gap:15px;border-top:1px solid var(--line);margin:0;padding:15px 0;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.schedule-detail-rows b{color:var(--muted);font-size:13px}
+@media(max-width:560px){.schedule-detail-rows p{grid-template-columns:1fr;gap:4px}.schedule-section{padding:20px 0}}
+
+/* Stage 03.1 — straightforward web form for schedule cards. */
+.schedule-manager{grid-column:1/-1}
+.schedule-create{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px!important;align-items:end;margin:18px 0 28px!important}
+.schedule-create .schedule-check,.schedule-create button{align-self:center}
+.schedule-check{display:flex!important;flex-direction:row!important;align-items:center;gap:10px;font-weight:500!important;font-size:14px}
+.schedule-check input{width:auto!important;min-width:18px;height:18px;accent-color:var(--orange)}
+.schedule-manager-grid{display:grid;grid-template-columns:minmax(210px,270px) minmax(0,1fr);gap:18px}
+.schedule-manager-list{background:#111;border:1px solid var(--line);padding:16px;max-height:670px;overflow:auto}
+.schedule-manager-list h3{margin:5px 0 16px;font-size:17px}
+.schedule-manager-list button{background:#191919;color:var(--warm);border:1px solid var(--line);width:100%;padding:14px;text-align:left;display:grid;gap:5px;margin-bottom:9px}
+.schedule-manager-list button.current{border-color:var(--orange);background:#292017}
+.schedule-manager-list button b{font-size:17px;overflow-wrap:anywhere}
+.schedule-manager-list button small{color:var(--muted);font-size:12px;line-height:1.4}
+.schedule-manager-details{min-width:0}
+.schedule-preview{background:#222;min-height:128px;padding:24px;margin-bottom:20px;border:2px solid #777;display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.schedule-preview b{font-size:clamp(23px,3vw,34px);line-height:1.15}
+.schedule-preview small{font-size:14px}
+.schedule-preview.theme-orange{border-color:var(--orange)}
+.schedule-preview.theme-blue{border-color:var(--blue)}
+.schedule-preview.theme-neutral{border-color:#999}
+.schedule-edit-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+.schedule-edit-fields label{min-width:0}
+.schedule-edit-fields select{background:#0b0b0b;color:var(--warm);border:1px solid #555;padding:14px 16px;font:inherit;min-height:53px}
+.schedule-description{grid-column:1/-1}
+@media(max-width:920px){.schedule-manager-grid{grid-template-columns:1fr}.schedule-manager-list{display:flex;gap:8px;max-height:none;overflow:auto}.schedule-manager-list h3{white-space:nowrap}.schedule-manager-list button{min-width:180px}}
+@media(max-width:560px){.schedule-create,.schedule-edit-fields{grid-template-columns:1fr}}

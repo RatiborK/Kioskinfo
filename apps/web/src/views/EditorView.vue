@@ -1,10 +1,12 @@
 <!-- apps/web/src/views/EditorView.vue — authenticated editor, debounce save and optimistic revisions. -->
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from 'vue';
+import ScheduleEditor from '../components/ScheduleEditor.vue';
 type Role = 'admin' | 'editor' | 'viewer';
 type Account = {id:string; username:string; displayName:string; role:Role};
 type Page = {id:string;slug:string;title:string;body:string;revision:number;published_revision:number|null};
 type Poster = {name:string;title:string;kind:'image'|'video';url:string;sizeBytes:number;updatedAt:string};
+const scheduleEditor = ref<{flush:()=>Promise<boolean>}|null>(null);
 const posters = ref<Poster[]>([]);
 const uploading = ref(false);
 const posterStatus = ref('');
@@ -87,6 +89,7 @@ async function login(){
 async function logout(){
   if(busy.value)return;
   if(changed){await save();if(changed)return;}
+  if(scheduleEditor.value && !(await scheduleEditor.value.flush()))return;
   if(timer)clearTimeout(timer);
   try{await api('/api/auth/logout',{method:'POST',headers,body:'{}'});}finally{user.value=null;pages.value=[];selectedId.value='';}
 }
@@ -160,6 +163,7 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
           </div>
         </div>
       </section>
+      <ScheduleEditor ref="scheduleEditor" :role="user.role" />
       <aside class="editor-page-list"><h2>Страницы</h2><button v-for="page in pages" :key="page.id" class="editor-page-link" :class="{'current':page.id===selectedId}" @click="selectPage(page)">{{page.title}}</button></aside>
       <section class="editor-panel">
         <h2>Содержимое страницы</h2>

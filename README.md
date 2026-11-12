@@ -1,31 +1,27 @@
 # НавиКультура
 
-Информационная платформа ГДК «Кировский»: браузерный экран посетителя и кабинет сотрудника. Основной сервер планируется на Windows ПК `DESKTOP-OBLAKO`.
+Веб-платформа информации ДК «Кировский»: экран посетителя (`/screen`) и кабинет сотрудника (`/editor`).
+Разрабатываем локально на ПК с VS Code; сервер `DESKTOP-OBLAKO` не задействован до завершения тестирования.
 
-**Этап 01 — лабораторная версия, не развернута в локальной сети ДК.**
+## Стек
 
-## Технологии
+Vue 3 + TypeScript + Vite, Fastify 5 + Node.js 26, PostgreSQL 18 для работы в локальной сети ДК.
 
-Vue 3 + TypeScript + Vite, Fastify + Node.js 26, PostgreSQL 18.
+## Локальный запуск без PostgreSQL
 
-## Разработка
+1. `npm.cmd install --no-audit --no-fund`
+2. `npm.cmd run check`
+3. Запустить задачу VS Code **Navikultura: Start API + Web** (или в двух терминалах `npm.cmd run dev:preview` и `npm.cmd run dev:web`).
+4. Открыть `http://127.0.0.1:5173/editor`; использовать логин `admin` и **временный пароль из терминала API**.
+5. Веб-форма расписания позволяет создавать, изменять и публиковать карточки. Опубликованные кнопки появляются на `/screen` через 10 секунд.
+6. Файлы афиш добавляются в `content/posters` или через редактор.
 
-1. Установить Node.js 26, PostgreSQL 18; использовать **отдельную тестовую** БД и пользователя с минимальными правами.
-2. Копировать `.env.example` в личное окружение, но не добавлять реальные пароли в git.
-3. Создать `DATABASE_URL` и `EDITOR_ORIGIN=http://127.0.0.1:5173` для API процесса.
-4. `npm install --no-audit --no-fund`
-5. `npm run migrate -w @navikultura/api`
-6. Создать админа через `npm run bootstrap:admin -w @navikultura/api -- admin`, подав пароль из stdin (не аргументом).
-7. В двух терминалах: `npm run dev:api` и `npm run dev:web`.
-8. Для новых сотрудников доступна команда `npm run create:user -w @navikultura/api -- LOGIN editor` (или `viewer`); пароль подаётся из stdin.
-9. `http://127.0.0.1:5173/editor` и `http://127.0.0.1:5173/screen`.
+Локальные данные хранятся в `content/schedule/records.json`, вне Git. **Этот режим только для одного ПК, не для локальной сети учреждения.**
 
-## Контроль качества
+## Серверный режим (позже)
 
-`npm run check` включает typecheck, API tests и web build. CI см. `.github/workflows/ci.yml`.
+Настроить отдельную PostgreSQL, выполнить `npm.cmd run migrate -w @navikultura/api`, создать администратора через `bootstrap:admin` и включить HTTPS перед предоставлением доступа сотрудникам. Прямое подключение Fastify к LAN не допускается.
 
-## Статусы
+## Контроль качества и этапы
 
-Stage 00 — опубликованная рабочая ветка; Stage 01 — кандидат для лабораторной проверки. Афиши и Excel будут реализованы на следующих этапах. Текущий редактор сохраняет только демонстрационную страницу `welcome`.
-
-Документация: `docs/STAGE01_ACCEPTANCE.md`, `docs/STAGE01_OBLAKO_PRECHECK.md`, `docs/ROADMAP.md`, `docs/SECURITY.md`.
+`npm.cmd run check` запускает проверку типов, тесты и сборку. Подробности: `docs/LOCAL_DEVELOPMENT.md`, `docs/SCHEDULE_WEB_EDITOR.md`, `docs/STAGE03_ACCEPTANCE.md`, `docs/ROADMAP.md`.
