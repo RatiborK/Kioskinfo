@@ -2,9 +2,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Navikultura: API (watch)",
+      "label": "Navikultura: API (preview)",
       "type": "shell",
-      "command": "npm.cmd run dev:api",
+      "command": "npm.cmd run dev:preview",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -32,7 +32,7 @@
     {
       "label": "Navikultura: Start API + Web",
       "dependsOn": [
-        "Navikultura: API (watch)",
+        "Navikultura: API (preview)",
         "Navikultura: Web (HMR)"
       ],
       "dependsOrder": "parallel",
@@ -44,6 +44,20 @@
       "command": "npm.cmd run check",
       "options": {
         "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Navikultura: API (PostgreSQL)",
+      "type": "shell",
+      "command": "npm.cmd run dev:api",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
       },
       "problemMatcher": []
     }

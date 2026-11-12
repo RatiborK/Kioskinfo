@@ -4,6 +4,10 @@ import { test } from 'node:test';
 import { createApp } from './app.js';
 import { hashPassword, tokenHash, verifyPassword } from './crypto.js';
 import type { Account, Page, PublicContent, Session, Store } from './model.js';
+import { FolderPosterRepository } from './posters.js';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 class MemoryStore implements Store {
   accounts: Account[] = [];
@@ -24,9 +28,9 @@ class MemoryStore implements Store {
 }
 const headers={'content-type':'application/json','x-navikultura-action':'1'};
 const loginBody=(username:string,password:string)=>({method:'POST' as const,url:'/api/auth/login',headers,payload:{username,password}});
-async function fixture(role:'admin'|'editor'|'viewer'='admin'){
+async function fixture(role:'admin'|'editor'|'viewer'='admin', posters?:FolderPosterRepository){
   const store=new MemoryStore();store.accounts=[{id:'account1',username:'worker',display_name:'Сотрудник',role,password_hash:await hashPassword('some-strong-password-123'),enabled:true}];
-  const app=createApp({store,allowedOrigin:'http://127.0.0.1:5173'});
+  const app=createApp({store,posters,allowedOrigin:'http://127.0.0.1:5173'});
   const login=await app.inject(loginBody('worker','some-strong-password-123'));
   assert.equal(login.statusCode,200);
   const cookie=login.headers['set-cookie'];assert.equal(typeof cookie,'string');
@@ -86,4 +90,37 @@ test('logout invalidates cookie session',async()=>{
     const logout=await app.inject({method:'POST',url:'/api/auth/logout',headers:{...headers,cookie},payload:{}});assert.equal(logout.statusCode,200);
     const after=await app.inject({method:'GET',url:'/api/auth/me',headers:{cookie}});assert.equal(after.statusCode,401);
   }finally{await app.close();}
+});
+
+test('poster API is public to view but protected for modifications', async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-api-posters-'));
+  const posters=new FolderPosterRepository(dir);
+  const app=createApp({store:new MemoryStore(),posters,allowedOrigin:'http://127.0.0.1:5173'});
+  try {
+    const listing=await app.inject({method:'GET',url:'/api/public/posters'});
+    assert.equal(listing.statusCode,200);assert.deepEqual(listing.json().posters,[]);
+    const anonymous=await app.inject({method:'POST',url:'/api/editor/posters',headers,payload:{name:'test.png',base64:'abc='}});
+    assert.equal(anonymous.statusCode,401);
+    const traversal=await app.inject({method:'GET',url:'/api/public/posters/..%2Fsecret.png/file'});
+    assert.equal(traversal.statusCode,404);
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
+});
+test('admin can upload and delete a verified poster, viewer cannot',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-api-posters-'));
+  const posters=new FolderPosterRepository(dir);
+  const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXjoAAAAASUVORK5CYII=';
+  const admin=await fixture('admin',posters);
+  try {
+    const upload=await admin.app.inject({method:'POST',url:'/api/editor/posters',headers:{...headers,cookie:admin.cookie},payload:{name:'Концерт.png',base64:png}});
+    assert.equal(upload.statusCode,201);
+    const item=upload.json().poster;
+    assert.equal(item.kind,'image');
+    const bytes=await admin.app.inject({method:'GET',url:item.url});
+    assert.equal(bytes.statusCode,200);assert.equal(bytes.headers['content-type'],'image/png');
+    const listing=await admin.app.inject({method:'GET',url:'/api/public/posters'});
+    assert.equal(listing.json().posters.length,1);
+    const removal=await admin.app.inject({method:'DELETE',url:'/api/editor/posters/'+encodeURIComponent(item.name),headers:{...headers,cookie:admin.cookie},payload:{}});
+    assert.equal(removal.statusCode,200);
+    assert.deepEqual(admin.store.events,['login','poster.upload','poster.delete']);
+  }finally{await admin.app.close();await rm(dir,{recursive:true,force:true});}
 });

@@ -4,6 +4,41 @@ import { onMounted, onBeforeUnmount, ref } from 'vue';
 type Role = 'admin' | 'editor' | 'viewer';
 type Account = {id:string; username:string; displayName:string; role:Role};
 type Page = {id:string;slug:string;title:string;body:string;revision:number;published_revision:number|null};
+type Poster = {name:string;title:string;kind:'image'|'video';url:string;sizeBytes:number;updatedAt:string};
+const posters = ref<Poster[]>([]);
+const uploading = ref(false);
+const posterStatus = ref('');
+const posterError = ref('');
+async function loadPosters(){
+  try {const response=await fetch('/api/public/posters',{cache:'no-store'});if(!response.ok)throw new Error('Каталог афиш недоступен');
+    const data:{posters:Poster[];ignored:number}=await response.json();posters.value=data.posters;
+    posterStatus.value=`Найдено афиш: ${data.posters.length}`+(data.ignored?`. Пропущено файлов: ${data.ignored}`:'');
+  }catch(e){posterError.value=String(e instanceof Error?e.message:e);}
+}
+function readBase64(file:File):Promise<string>{return new Promise((resolve,reject)=>{
+  const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');
+  reader.onerror=()=>reject(new Error('Не удалось прочитать файл'));
+  reader.readAsDataURL(file);
+});}
+async function uploadPosters(event:Event){
+  const input=event.target as HTMLInputElement;
+  const files=Array.from(input.files||[]);if(!files.length)return;
+  uploading.value=true;posterError.value='';
+  try {for(const file of files){
+    if(file.size>8*1024*1024)throw new Error(`${file.name}: файл больше 8 МБ`);
+    const base64=await readBase64(file);
+    await api('/api/editor/posters',{method:'POST',headers,body:JSON.stringify({name:file.name,base64})});
+  } await loadPosters();posterStatus.value=`Загружено: ${files.length}. Терминалы обновятся автоматически.`;
+  }catch(e){posterError.value=String(e instanceof Error?e.message:e);await loadPosters();}
+  finally{uploading.value=false;input.value='';}
+}
+async function removePoster(item:Poster){
+  if(!window.confirm(`Удалить афишу «${item.title}»?`))return;
+  posterError.value='';
+  try {await api(`/api/editor/posters/${encodeURIComponent(item.name)}`,{method:'DELETE',headers,body:'{}'});
+    await loadPosters();posterStatus.value='Афиша удалена. Экран обновится автоматически.';
+  }catch(e){posterError.value=String(e instanceof Error?e.message:e);}
+}
 const user = ref<Account|null>(null);
 const username = ref(''); const password = ref('');
 const pages = ref<Page[]>([]); const selectedId = ref('');
@@ -25,6 +60,7 @@ function usePage(page:Page) {
 }
 async function loadPages() {
   const data:{pages:Page[]}=await api('/api/editor/pages'); pages.value=data.pages;
+  await loadPosters();
   const current=data.pages.find(p=>p.id===selectedId.value)||data.pages[0];
   if(current) usePage(current);
 }
@@ -107,6 +143,23 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
     </section>
     <section v-else class="editor-workspace">
       <div class="editor-toolbar"><span>{{user.displayName}} · {{user.role}}</span><button class="secondary-button" type="button" @click="logout">Выйти</button></div>
+      <section class="editor-panel poster-editor">
+        <div class="poster-editor-top"><div><span class="eyebrow">АВТОМАТИЧЕСКИЙ КАТАЛОГ</span><h2>Афиши и медиаматериалы</h2></div><button type="button" class="secondary-button" @click="loadPosters">Обновить список</button></div>
+        <p class="editor-hint">Добавь изображение в браузере или скопируй его в папку <code>content/posters</code> проекта. При добавлении и удалении файлов экран обновится автоматически.</p>
+        <label v-if="user.role!=='viewer'" class="poster-upload">Добавить афиши (JPG, PNG, WebP до 8 МБ)
+          <input type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple :disabled="uploading" @change="uploadPosters" />
+        </label>
+        <p class="status-line" role="status">{{uploading?'Загрузка…':posterStatus}}</p>
+        <p v-if="posterError" class="editor-error" role="alert">{{posterError}}</p>
+        <div class="poster-editor-list" v-if="posters.length">
+          <div v-for="poster in posters" :key="poster.name" class="poster-editor-row">
+            <img v-if="poster.kind==='image'" :src="poster.url" :alt="poster.title" loading="lazy" />
+            <span v-else class="poster-video-icon">▶</span>
+            <span class="poster-editor-name">{{poster.title}}<small>{{(poster.sizeBytes/1024/1024).toFixed(2)}} МБ</small></span>
+            <button v-if="user.role!=='viewer'" class="secondary-button" type="button" @click="removePoster(poster)">Удалить</button>
+          </div>
+        </div>
+      </section>
       <aside class="editor-page-list"><h2>Страницы</h2><button v-for="page in pages" :key="page.id" class="editor-page-link" :class="{'current':page.id===selectedId}" @click="selectPage(page)">{{page.title}}</button></aside>
       <section class="editor-panel">
         <h2>Содержимое страницы</h2>

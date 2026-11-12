@@ -11,7 +11,8 @@
     "start": "node dist/index.js",
     "migrate": "tsx src/migrate.ts",
     "bootstrap:admin": "tsx src/bootstrap-admin.ts",
-    "create:user": "tsx src/create-user.ts"
+    "create:user": "tsx src/create-user.ts",
+    "dev:preview": "tsx watch src/index-preview.ts"
   },
   "dependencies": {
     "fastify": "^5.12.8",
