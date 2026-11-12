@@ -37,7 +37,9 @@ const selectedScheduleId = ref<string|null>(null);
 const scheduleStatus = ref('');
 const searchQuery=ref('');
 const keyboardOpen=ref(false);
-const filteredSchedule=computed(()=>filterSchedule(schedule.value,searchQuery.value));
+const searchOpen=ref(false);
+const searchInput=ref<HTMLInputElement|null>(null);
+const filteredSchedule=computed(()=>filterSchedule(schedule.value,searchOpen.value?searchQuery.value:''));
 const selectedSchedule = computed(()=>schedule.value.find(x=>x.id===selectedScheduleId.value) ?? null);
 async function reloadSchedule(){
   try {
@@ -57,15 +59,46 @@ let lastManualPosterInput=0;
 const IDLE_RETURN_MS=180000;
 function noteActivity(){lastActivity=Date.now();}
 function changeSection(section:(typeof items)[number]['id']){
-  noteActivity();current.value=section;selectedScheduleId.value=null;keyboardOpen.value=false;
-  if(section!=='schedule'&&section!=='groups')searchQuery.value='';
+  noteActivity();
+  // Navigation changes the entire page; a previous visitor's query must not leak to another section.
+  if(section!==current.value){
+    current.value=section;
+    selectedScheduleId.value=null;
+    searchOpen.value=false;
+    keyboardOpen.value=false;
+    searchQuery.value='';
+  }
+}
+function focusSearchInput(){searchInput.value?.focus({preventScroll:true});}
+function focusCurrentPage(){
+  if(searchOpen.value && (current.value==='schedule'||current.value==='groups')){
+    focusSearchInput();return;
+  }
+  document.querySelector<HTMLElement>('.screen-content [data-page-title]')?.focus({preventScroll:true});
+}
+function toggleSearch(){
+  noteActivity();
+  if(current.value!=='schedule'&&current.value!=='groups'){
+    selectedScheduleId.value=null;
+    keyboardOpen.value=false;
+    searchQuery.value='';
+    searchOpen.value=true;
+    current.value='schedule';
+    return;
+  }
+  if(selectedScheduleId.value)selectedScheduleId.value=null;
+  searchOpen.value=!searchOpen.value;
+  if(!searchOpen.value){
+    searchQuery.value='';
+    keyboardOpen.value=false;
+  }
 }
 function openSchedule(id:string){noteActivity();keyboardOpen.value=false;selectedScheduleId.value=id;}
 function backToSchedule(){noteActivity();selectedScheduleId.value=null;}
 function resetIfIdle(){
   if(!shouldReturnHome(lastActivity,Date.now(),IDLE_RETURN_MS))return;
-  if(current.value!=='posters'||selectedScheduleId.value||keyboardOpen.value||searchQuery.value){
-    current.value='posters';selectedScheduleId.value=null;keyboardOpen.value=false;searchQuery.value='';
+  if(current.value!=='posters'||selectedScheduleId.value||searchOpen.value||keyboardOpen.value||searchQuery.value){
+    current.value='posters';selectedScheduleId.value=null;searchOpen.value=false;keyboardOpen.value=false;searchQuery.value='';
     posterIndex.value=0;
   }
 }
@@ -108,17 +141,32 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
 
 <template>
   <main class="shell screen-shell" :data-visitor-theme="visitorTheme">
-    <div class="screen-content">
+    <Transition name="kiosk-page" mode="out-in" @after-enter="focusCurrentPage">
+      <div :key="current" class="screen-content">
       <header class="brand-row">
         <div class="brand-glyph" aria-hidden="true">Н</div>
         <div class="brand-copy"><strong>НАВИКУЛЬТУРА</strong><span>ЦИФРОВОЙ ИНФОЦЕНТР · ГДК «КИРОВСКИЙ»</span></div>
+        <button type="button" class="kiosk-search-trigger" :class="{active:searchOpen&&(current==='schedule'||current==='groups')}"
+          :aria-expanded="searchOpen&&(current==='schedule'||current==='groups')" aria-controls="kiosk-search-panel"
+          :aria-label="searchOpen&&(current==='schedule'||current==='groups')?'Закрыть поиск':'Открыть поиск по коллективам'"
+          title="Поиск" @click="toggleSearch">
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="27" height="27" fill="none"
+            stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/>
+          </svg>
+        </button>
         <span class="stage-note">АФИША · ПОДКЛЮЧЕНА</span>
       </header>
       <section v-if="current==='posters'" class="poster-gallery" aria-label="Актуальные афиши">
-        <div class="poster-heading"><span class="hero-overline">ПРОГРАММА МЕРОПРИЯТИЙ</span><h1>Афиша<span class="dot">.</span></h1></div>
+        <div class="poster-heading"><span class="hero-overline">ПРОГРАММА МЕРОПРИЯТИЙ</span><h1 data-page-title tabindex="-1">Афиша<span class="dot">.</span></h1></div>
         <div v-if="activePoster" class="poster-stage">
-          <img v-if="activePoster.kind==='image'" class="poster-media" :src="activePoster.url" :alt="activePoster.title" />
-          <video v-else :key="activePoster.name" class="poster-media" :src="activePoster.url" autoplay muted playsinline controls @ended="movePoster(1,false)"></video>
+          <Transition name="kiosk-poster">
+            <img v-if="activePoster.kind==='image'" :key="'image:'+activePoster.name"
+              class="poster-media" :src="activePoster.url" :alt="activePoster.title" />
+            <video v-else :key="'video:'+activePoster.name"
+              class="poster-media" :src="activePoster.url" autoplay muted playsinline controls
+              @ended="movePoster(1,false)"></video>
+          </Transition>
           <div class="poster-caption"><strong>{{activePoster.title}}</strong><span>{{posterIndex+1}} / {{posters.length}}</span></div>
           <div v-if="posters.length>1" class="poster-controls"><button type="button" aria-label="Предыдущая афиша" @click="movePoster(-1)">‹</button><button type="button" aria-label="Следующая афиша" @click="movePoster(1)">›</button></div>
         </div>
@@ -135,8 +183,9 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         <p v-if="posterError" class="poster-warning" role="status">{{posterError}}</p>
       </section>
       <section v-else-if="current==='schedule'||current==='groups'" class="schedule-section" aria-live="polite">
-        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1>{{current==='groups'?'Коллективы':'Расписание'}}<span class="dot">.</span></h1></div>
-        <template v-if="selectedSchedule">
+        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1 data-page-title tabindex="-1">{{current==='groups'?'Коллективы':'Расписание'}}<span class="dot">.</span></h1></div>
+        <Transition name="kiosk-detail" mode="out-in">
+          <div v-if="selectedSchedule" :key="'detail:'+selectedSchedule.id" class="schedule-detail-layout">
           <button type="button" class="schedule-back" @click="backToSchedule">← Все направления</button>
           <article class="schedule-detail">
             <span class="eyebrow">КАРТОЧКА КОЛЛЕКТИВА</span>
@@ -149,12 +198,13 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
               <p v-if="selectedSchedule.description"><b>Описание</b><span>{{selectedSchedule.description}}</span></p>
             </div>
           </article>
-        </template>
-        <template v-else>
-          <div class="kiosk-search-panel" role="search" aria-label="Найти направление или коллектив">
+          </div>
+          <div v-else key="catalog" class="schedule-index-layout">
+          <Transition name="kiosk-search" @after-enter="focusSearchInput">
+          <div v-if="searchOpen" id="kiosk-search-panel" class="kiosk-search-panel" role="search" aria-label="Найти направление или коллектив">
             <label for="schedule-search">Поиск по коллективам, руководителям и кабинетам</label>
             <div class="kiosk-search-row">
-              <input id="schedule-search" v-model="searchQuery" type="search" maxlength="80"
+              <input id="schedule-search" ref="searchInput" v-model="searchQuery" type="search" maxlength="80"
                 autocomplete="off" spellcheck="false" placeholder="Например: Танцы, кабинет 210, руководитель"
                 @input="noteActivity" />
               <button type="button" class="kiosk-search-keyboard-toggle" :aria-expanded="keyboardOpen" @click="keyboardOpen=!keyboardOpen">
@@ -168,26 +218,28 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
               {{searchQuery.trim()?'Найдено: '+filteredSchedule.length+' из '+schedule.length:'Направлений: '+schedule.length}}
             </p>
           </div>
+          </Transition>
           <template v-if="filteredSchedule.length">
             <p class="schedule-hint">Выберите направление, чтобы посмотреть руководителя, дни занятий и кабинет.</p>
-            <div class="schedule-buttons">
+            <TransitionGroup name="kiosk-card" tag="div" class="schedule-buttons">
               <button v-for="entry in filteredSchedule" :key="entry.id" type="button" class="schedule-button"
                 @click="openSchedule(entry.id)">
                 <strong>{{entry.label}}</strong><span>{{entry.time||entry.group}}</span><span class="schedule-arrow">↗</span>
               </button>
-            </div>
+            </TransitionGroup>
           </template>
           <div v-else-if="schedule.length" class="kiosk-search-empty" role="status">
             <strong>Ничего не найдено</strong><span>Попробуйте другое название, фамилию руководителя или кабинет.</span>
-            <button type="button" class="schedule-back" @click="searchQuery='';keyboardOpen=false">Показать все направления</button>
+            <button type="button" class="schedule-back" @click="searchQuery='';keyboardOpen=false;noteActivity()">Показать все направления</button>
           </div>
           <div v-else class="poster-empty"><strong>Расписание появится автоматически</strong><p>Сотрудник создаст карточки через раздел «Расписание» в веб-редакторе. Опубликованные карточки появятся здесь автоматически.</p></div>
-        </template>
+          </div>
+        </Transition>
         <p v-if="scheduleStatus" class="poster-warning" role="status">{{scheduleStatus}}</p>
       </section>
       <section v-else class="hero" aria-live="polite">
         <div class="hero-overline"><i></i> ИНФОРМАЦИОННАЯ ПЛАТФОРМА</div>
-        <h1>{{ selected.label }}<span class="dot">.</span></h1>
+        <h1 data-page-title tabindex="-1">{{ selected.label }}<span class="dot">.</span></h1>
         <p v-if="current === 'navigation'">Поиск помещений и интерактивная навигация по зданию.</p>
         <p v-else-if="current === 'about'">{{ welcome?.body ?? 'Информация об учреждении и его деятельности.' }}</p>
         <p v-else>Контакты и сведения для посетителей.</p>
@@ -197,10 +249,11 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         </div>
       </section>
       <footer class="screen-footer"><span>НАВИГАЦИЯ · СОБЫТИЯ · ЛЮДИ</span><span>ДК «КИРОВСКИЙ»</span></footer>
-    </div>
+      </div>
+    </Transition>
     <nav class="side-menu" aria-label="Разделы информационной системы">
       <span class="menu-title">РАЗДЕЛЫ</span>
-      <button v-for="(item,index) in items" :key="item.id" type="button" class="nav-item" :class="{active:current===item.id}" @click="changeSection(item.id)">
+      <button v-for="(item,index) in items" :key="item.id" type="button" class="nav-item" :class="{active:current===item.id}" :aria-current="current===item.id?'page':undefined" @click="changeSection(item.id)">
         <span class="nav-index">{{ String(index+1).padStart(2,'0') }}</span><span class="nav-label">{{ item.label }}</span><span class="nav-glyph" aria-hidden="true">{{ item.icon }}</span>
       </button>
       <div class="menu-bottom">NAVIKULTURA / 2026</div>
