@@ -1,0 +1,9 @@
+{
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1200,
+  "git.autofetch": true,
+  "git.confirmSync": true,
+  "git.enableSmartCommit": false,
+  "editor.formatOnSave": true,
+  "terminal.integrated.cwd": "${workspaceFolder}"
+}
