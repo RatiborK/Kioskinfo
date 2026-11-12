@@ -4,7 +4,7 @@
     {
       "label": "Navikultura: API (watch)",
       "type": "shell",
-      "command": "npm run dev:api",
+      "command": "npm.cmd run dev:api",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -18,7 +18,7 @@
     {
       "label": "Navikultura: Web (HMR)",
       "type": "shell",
-      "command": "npm run dev:web",
+      "command": "npm.cmd run dev:web",
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -41,7 +41,7 @@
     {
       "label": "Navikultura: Run checks",
       "type": "shell",
-      "command": "npm run check",
+      "command": "npm.cmd run check",
       "options": {
         "cwd": "${workspaceFolder}"
       },
