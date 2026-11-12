@@ -4,8 +4,9 @@ import { createSessionToken, tokenHash, verifyPassword } from './crypto.js';
 import type { Account, PublicContent, Store } from './model.js';
 import { posterFileStream, type PosterRepository } from './posters.js';
 import { validateScheduleFields, type ScheduleRepository } from './schedule.js';
+import { defaultThemeSettings,isThemeId,THEME_NAMES, VISITOR_THEME_IDS,type ThemeRepository } from './themes.js';
 
-export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; cookieSecure?: boolean; allowedOrigin?: string }
+export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; cookieSecure?: boolean; allowedOrigin?: string }
 const MAX_AGE_S = 8 * 60 * 60;
 const ID = /^[a-z0-9_-]{1,80}$/i;
 const cookieName = (secure: boolean) => secure ? '__Host-navikultura_sid' : 'navikultura_dev_sid';
@@ -21,7 +22,7 @@ function userPublic(account: Account) {
 }
 export function createApp(options: AppOptions) {
   const app = Fastify({ logger: false, bodyLimit: 11_000_000 });
-  const { store, posters, schedule, cookieSecure = false, allowedOrigin } = options;
+  const { store, posters, schedule, themes, cookieSecure = false, allowedOrigin } = options;
   const failedLogins = new Map<string, { count: number; windowStart: number }>();
   const mutating = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
   app.addHook('onRequest', async (request, reply) => {
@@ -58,6 +59,43 @@ export function createApp(options: AppOptions) {
   app.get('/api/public/schedule', async (_request, reply) => {
     reply.header('Cache-Control', 'no-store');
     return schedule ? await schedule.list() : { entries: [], version:'none', updatedAt:null, stale:false, message:'Расписание ещё не настроено' };
+  });
+  // Published design is independent from content; kiosks never receive a draft choice.
+  app.get('/api/public/theme',async (_request,reply)=>{
+    reply.header('Cache-Control','no-store');
+    const selected=themes?await themes.get():defaultThemeSettings();
+    return {theme:selected.published,revision:selected.published_revision};
+  });
+  app.get('/api/editor/theme',async (request,reply)=>{
+    const account=await requireRole(request,reply,['admin','editor','viewer']);
+    if(!account)return;
+    reply.header('Cache-Control','no-store');
+    return {settings:themes?await themes.get():defaultThemeSettings(),
+      available:VISITOR_THEME_IDS.map(id=>({id,name:THEME_NAMES[id]}))};
+  });
+  app.patch<{Body:{id?:unknown;expectedRevision?:unknown}}>('/api/editor/theme',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin','editor']);
+    if(!account)return;
+    if(!themes)return reply.code(503).send({error:'Хранилище тем не настроено'});
+    const {id,expectedRevision}=request.body??{};
+    if(!isThemeId(id)||!Number.isSafeInteger(expectedRevision)||Number(expectedRevision)<1)
+      return reply.code(400).send({error:'Укажите тему и корректную версию'});
+    const result=await themes.choose(id,Number(expectedRevision));
+    if(!result)return reply.code(409).send({error:'Тема изменена другим сотрудником. Обновите список'});
+    await store.audit(account.id,'theme.select',{id,resultRevision:result.revision});
+    reply.header('Cache-Control','no-store');return {settings:result};
+  });
+  app.post<{Body:{expectedRevision?:unknown}}>('/api/editor/theme/publish',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin']);
+    if(!account)return;
+    if(!themes)return reply.code(503).send({error:'Хранилище тем не настроено'});
+    const {expectedRevision}=request.body??{};
+    if(!Number.isSafeInteger(expectedRevision)||Number(expectedRevision)<1)
+      return reply.code(400).send({error:'Укажите корректную версию темы'});
+    const result=await themes.publish(Number(expectedRevision));
+    if(!result)return reply.code(409).send({error:'Тема изменена другим сотрудником. Обновите список'});
+    await store.audit(account.id,'theme.publish',{id:result.published,revision:result.revision});
+    reply.header('Cache-Control','no-store');return {settings:result};
   });
   // Browser schedule editor: drafts are private, only published snapshots reach the kiosk.
   app.get('/api/editor/schedule', async (request, reply) => {

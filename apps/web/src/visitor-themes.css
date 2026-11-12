@@ -1,0 +1,132 @@
+/* apps/web/src/visitor-themes.css — eight deliberately scoped kiosk themes.
+   The administrator keeps a consistent neutral interface. Only the visitor screen
+   and non-interactive theme previews use these palettes. No user-supplied CSS. */
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="dk"]{
+  --v-bg:#090a10;--v-nav:#151620;--v-card:#191c28;--v-text:#f6f4ef;
+  --v-muted:#bec0ca;--v-accent:#ff914d;--v-on-accent:#17110d;
+  --v-alt:#8cb4ff;--v-line:#4a4d60;--v-radius:4px;--v-display:900;
+  --v-backdrop:radial-gradient(ellipse at 80% 14%,#25213b88,transparent 52%);
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="holiday"]{
+  --v-bg:#200b16;--v-nav:#321329;--v-card:#3f1d2c;--v-text:#fff8e9;
+  --v-muted:#e5cfc5;--v-accent:#f6ca80;--v-on-accent:#2d1420;
+  --v-alt:#f3b9cd;--v-line:#896070;--v-radius:18px;--v-display:800;
+  --v-backdrop:radial-gradient(circle at 15% 12%,#dfb96a55 0 3px,transparent 5px),
+    radial-gradient(circle at 78% 20%,#f5cb9266 0 4px,transparent 6px),
+    radial-gradient(ellipse at 60% -10%,#8b32536b,transparent 61%);
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="modern"]{
+  --v-bg:#131416;--v-nav:#1e2022;--v-card:#232527;--v-text:#fafaf7;
+  --v-muted:#c5c6c6;--v-accent:#f1f0e9;--v-on-accent:#171818;
+  --v-alt:#d1d3d5;--v-line:#626467;--v-radius:0;--v-display:750;
+  --v-backdrop:linear-gradient(125deg,#ffffff06 0 38%,transparent 38% 100%);
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="aurora"]{
+  --v-bg:#061c27;--v-nav:#0c2a36;--v-card:#123541;--v-text:#f0fffb;
+  --v-muted:#bed5d7;--v-accent:#7aebd4;--v-on-accent:#06262b;
+  --v-alt:#99caff;--v-line:#4b747d;--v-radius:20px;--v-display:800;
+  --v-backdrop:radial-gradient(ellipse at 75% 8%,#45b8a65c,transparent 60%),
+    radial-gradient(ellipse at 6% 80%,#2a78a23b,transparent 65%);
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="poster"]{
+  --v-bg:#f5f0e5;--v-nav:#fffaf0;--v-card:#fffdf6;--v-text:#2b221d;
+  --v-muted:#60564c;--v-accent:#963419;--v-on-accent:#fffdf6;
+  --v-alt:#3e6971;--v-line:#998b7b;--v-radius:2px;--v-display:950;
+  --v-backdrop:repeating-linear-gradient(0deg,transparent 0 62px,#6f45260d 62px 63px);
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="gallery"]{
+  --v-bg:#e8eee5;--v-nav:#dbe6dc;--v-card:#f9faf5;--v-text:#23382e;
+  --v-muted:#4c6355;--v-accent:#1f6046;--v-on-accent:#fffdf4;
+  --v-alt:#7b4f3d;--v-line:#819c8b;--v-radius:13px;--v-display:750;
+  --v-backdrop:radial-gradient(ellipse at 98% 0,#d0e5d0,transparent 50%);
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="neon"]{
+  --v-bg:#100b20;--v-nav:#1a1031;--v-card:#261542;--v-text:#faf3ff;
+  --v-muted:#cec1e9;--v-accent:#f7a0ff;--v-on-accent:#260c32;
+  --v-alt:#6df9e6;--v-line:#765e9b;--v-radius:10px;--v-display:950;
+  --v-backdrop:repeating-linear-gradient(90deg,transparent 0 70px,#a27cff13 70px 71px),
+    radial-gradient(ellipse at 80% 15%,#ae39e94d,transparent 62%);
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="kids"]{
+  --v-bg:#fff6db;--v-nav:#fff0c6;--v-card:#fffcf3;--v-text:#25344d;
+  --v-muted:#526278;--v-accent:#a62e57;--v-on-accent:#fffaf7;
+  --v-alt:#276b81;--v-line:#b6a08b;--v-radius:24px;--v-display:850;
+  --v-backdrop:radial-gradient(circle at 90% 18%,#f5b4b65c 0 9%,transparent 9.5%),
+    radial-gradient(circle at 20% 90%,#8cd5ca77 0 8%,transparent 8.5%);
+}
+.screen-shell{background:var(--v-bg);color:var(--v-text);font-family:Inter,"Segoe UI",Arial,sans-serif}
+.screen-shell .screen-content{background-color:var(--v-bg);background-image:var(--v-backdrop);color:var(--v-text)}
+.screen-shell .screen-content::before{border-color:var(--v-line);opacity:.4}
+.screen-shell .side-menu{background:var(--v-nav);border-left:1px solid var(--v-line)}
+.screen-shell .brand-glyph{background:var(--v-accent);color:var(--v-on-accent)}
+.screen-shell .brand-copy strong,.screen-shell .nav-label{color:var(--v-text)}
+.screen-shell .brand-copy span,.screen-shell .menu-title,.screen-shell .menu-bottom,
+.screen-shell .nav-index,.screen-shell .screen-footer,.screen-shell .hero-overline,
+.screen-shell .schedule-hint,.screen-shell .schedule-detail-rows b{color:var(--v-muted)}
+.screen-shell .stage-note,.screen-shell .dot{color:var(--v-accent)}
+.screen-shell .nav-item{color:var(--v-text);border-bottom-color:var(--v-line)}
+.screen-shell .nav-item:hover,.screen-shell .nav-item:focus-visible,
+.screen-shell .nav-item.active{color:var(--v-accent);background:var(--v-card)}
+.screen-shell .nav-item:focus-visible,.screen-shell .schedule-button:focus-visible{outline:3px solid var(--v-alt);outline-offset:-4px}
+.screen-shell .feature-primary{background:var(--v-accent);color:var(--v-on-accent);border-radius:var(--v-radius)}
+.screen-shell .feature-secondary,.screen-shell .poster-empty,.screen-shell .schedule-detail,
+.screen-shell .poster-stage{background:var(--v-card);color:var(--v-text);border-color:var(--v-line);border-radius:var(--v-radius)}
+.screen-shell .feature-grid b,.screen-shell .hero h1,.screen-shell .schedule-header h1{font-weight:var(--v-display);color:var(--v-text)}
+.screen-shell .feature-primary b{color:var(--v-on-accent)}
+.screen-shell .hero>p,.screen-shell .poster-empty p,.screen-shell .schedule-detail-rows span{color:var(--v-text)}
+.screen-shell .schedule-button{background:var(--v-card);border:2px solid var(--v-accent);color:var(--v-text);
+  border-radius:var(--v-radius);min-height:158px;min-width:0;touch-action:manipulation}
+.screen-shell .schedule-button strong{color:var(--v-text);font-size:clamp(20px,2vw,30px)}
+.screen-shell .schedule-button span:not(.schedule-arrow){color:var(--v-muted);opacity:1}
+.screen-shell .schedule-button:hover,.screen-shell .schedule-button:focus-visible{
+  background:var(--v-accent);border-color:var(--v-accent);color:var(--v-on-accent)}
+.screen-shell .schedule-button:hover strong,.screen-shell .schedule-button:focus-visible strong,
+.screen-shell .schedule-button:hover span,.screen-shell .schedule-button:focus-visible span{color:var(--v-on-accent)}
+.screen-shell .schedule-back{color:var(--v-text);border-color:var(--v-line)}
+.screen-shell .schedule-back:hover{border-color:var(--v-accent)}
+.screen-shell .schedule-detail{border:2px solid var(--v-accent)}
+.screen-shell .schedule-detail h2{color:var(--v-text)}
+.screen-shell .schedule-detail-rows p{border-color:var(--v-line)}
+.screen-shell .poster-caption{color:#fff;background:linear-gradient(transparent,#08090ddf)}
+.screen-shell .poster-controls button{min-height:48px;min-width:48px}
+.screen-shell .schedule-button,.screen-shell .nav-item{transition:background-color .15s,border-color .15s}
+.screen-shell[data-visitor-theme="holiday"] .brand-glyph{border-radius:50%;clip-path:none}
+.screen-shell[data-visitor-theme="modern"] .brand-glyph{clip-path:none;transform:rotate(-6deg)}
+.screen-shell[data-visitor-theme="kids"] .brand-glyph{clip-path:none;border-radius:40%}
+.screen-shell[data-visitor-theme="neon"] .schedule-button{box-shadow:0 0 16px #d45cff33}
+.screen-shell[data-visitor-theme="poster"] .schedule-button strong{font-weight:950}
+.screen-shell[data-visitor-theme="gallery"] .schedule-button{border-width:1px}
+.screen-shell .side-menu button{touch-action:manipulation}
+
+/* In-editor theme cards and live local mockup: a compact copy of the visitor color tokens. */
+.visitor-theme-preview{background:var(--v-bg);background-image:var(--v-backdrop);color:var(--v-text);
+  border:1px solid var(--v-line);border-radius:var(--v-radius);padding:16px;min-height:158px;
+  display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.visitor-theme-preview .theme-mini-header{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  font-size:11px;letter-spacing:.09em;font-weight:800}
+.visitor-theme-preview .theme-mini-header i{width:18px;height:18px;border-radius:4px;display:inline-grid;
+  place-items:center;background:var(--v-accent);color:var(--v-on-accent);font-style:normal}
+.visitor-theme-preview .theme-mini-title{font-size:24px;line-height:1.05;letter-spacing:-.04em;font-weight:var(--v-display)}
+.visitor-theme-preview .theme-mini-controls{display:flex;gap:8px}
+.visitor-theme-preview .theme-mini-controls span{background:var(--v-card);border:1px solid var(--v-accent);
+  border-radius:var(--v-radius);padding:9px;flex:1;font-size:11px;color:var(--v-text);text-align:center}
+.visitor-theme-preview .theme-mini-bottom{display:flex;justify-content:space-between;gap:10px;font-size:10px;color:var(--v-muted)}
+.visitor-theme-workspace{background:#151515;border:1px solid var(--line);padding:clamp(16px,3vw,30px)}
+.visitor-theme-intro{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:20px}
+.visitor-theme-intro h2{font-size:27px;margin:8px 0}
+.visitor-theme-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:14px}
+.visitor-theme-card{background:#1c1c1c;color:#f4f2ec;border:2px solid #515151;border-radius:10px;
+  text-align:left;padding:11px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.visitor-theme-card.selected{border-color:var(--orange);background:#292018}
+.visitor-theme-card:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+.visitor-theme-card strong{font-size:18px}
+.visitor-theme-card small{color:#c1c0bd;line-height:1.45}
+.visitor-theme-flag{color:#ffbd89;font-weight:700;font-size:12px;min-height:18px}
+.visitor-theme-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:24px}
+.visitor-theme-actions p{color:#bcbab5;font-size:13px;line-height:1.5;margin:0}
+.visitor-theme-large{margin:22px 0 0}
+.visitor-theme-large .visitor-theme-preview{min-height:290px;padding:30px;gap:25px}
+.visitor-theme-large .theme-mini-title{font-size:clamp(32px,5vw,62px)}
+.visitor-theme-large .theme-mini-controls span{padding:22px;font-size:16px}
+@media(max-width:600px){.visitor-theme-intro{flex-direction:column}.visitor-theme-large .visitor-theme-preview{min-height:230px;padding:17px}.visitor-theme-large .theme-mini-controls{flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.screen-shell .schedule-button,.screen-shell .nav-item{transition:none}}

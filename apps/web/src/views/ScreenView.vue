@@ -12,6 +12,17 @@ const items = [
 ] as const;
 const current = ref<(typeof items)[number]['id']>('posters');
 const welcome = ref<{ title:string; body:string } | null>(null);
+type VisitorTheme='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
+const visitorTheme=ref<VisitorTheme>('dk');
+const knownThemeIds=new Set(['dk','holiday','modern','aurora','poster','gallery','neon','kids']);
+async function reloadVisitorTheme(){
+  try{
+    const response=await fetch('/api/public/theme',{cache:'no-store'});
+    if(!response.ok)return;
+    const body:{theme:string}=await response.json();
+    if(knownThemeIds.has(body.theme))visitorTheme.value=body.theme as VisitorTheme;
+  }catch{/* Keep the last known theme while offline. */}
+}
 type Poster = {name:string; title:string; kind:'image'|'video'; url:string; updatedAt:string};
 const posters = ref<Poster[]>([]);
 const posterIndex = ref(0);
@@ -50,8 +61,8 @@ function nextPoster(){if(posters.value.length)posterIndex.value=(posterIndex.val
 function previousPoster(){if(posters.value.length)posterIndex.value=(posterIndex.value+posters.value.length-1)%posters.value.length;}
 const activePoster=computed(()=>posters.value[posterIndex.value]);
 onMounted(async () => {
-  await Promise.all([reloadPosters(),reloadSchedule()]);
-  reloadHandle=setInterval(()=>{void reloadPosters();void reloadSchedule();},10000);
+  await Promise.all([reloadPosters(),reloadSchedule(),reloadVisitorTheme()]);
+  reloadHandle=setInterval(()=>{void reloadPosters();void reloadSchedule();void reloadVisitorTheme();},10000);
   slideshowHandle=setInterval(()=>{if(activePoster.value?.kind!=='video')nextPoster();},8000);
   try { const response = await fetch('/api/public/pages/welcome', {cache:'no-store'});
     if (response.ok) {const data:{page:{title:string;body:string}} = await response.json(); welcome.value=data.page;}
@@ -62,7 +73,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
 </script>
 
 <template>
-  <main class="shell screen-shell">
+  <main class="shell screen-shell" :data-visitor-theme="visitorTheme">
     <div class="screen-content">
       <header class="brand-row">
         <div class="brand-glyph" aria-hidden="true">Н</div>
@@ -84,7 +95,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1>{{current==='groups'?'Коллективы':'Расписание'}}<span class="dot">.</span></h1></div>
         <template v-if="selectedSchedule">
           <button type="button" class="schedule-back" @click="selectedScheduleId=null">← Все направления</button>
-          <article class="schedule-detail" :class="'theme-'+selectedSchedule.theme">
+          <article class="schedule-detail">
             <span class="eyebrow">КАРТОЧКА КОЛЛЕКТИВА</span>
             <h2>{{selectedSchedule.group}}</h2>
             <div class="schedule-detail-rows">
@@ -99,7 +110,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         <template v-else-if="schedule.length">
           <p class="schedule-hint">Выберите направление, чтобы посмотреть руководителя, дни занятий и кабинет.</p>
           <div class="schedule-buttons">
-            <button v-for="entry in schedule" :key="entry.id" type="button" class="schedule-button" :class="'theme-'+entry.theme" @click="selectedScheduleId=entry.id">
+            <button v-for="entry in schedule" :key="entry.id" type="button" class="schedule-button" @click="selectedScheduleId=entry.id">
               <strong>{{entry.label}}</strong><span>{{entry.time||entry.group}}</span><span class="schedule-arrow">↗</span>
             </button>
           </div>

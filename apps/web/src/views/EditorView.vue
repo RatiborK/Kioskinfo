@@ -3,6 +3,7 @@
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ScheduleEditor from '../components/ScheduleEditor.vue';
+import VisitorThemeEditor from '../components/VisitorThemeEditor.vue';
 type Role = 'admin' | 'editor' | 'viewer';
 type Account = {id:string; username:string; displayName:string; role:Role};
 type Page = {id:string;slug:string;title:string;body:string;revision:number;published_revision:number|null};
@@ -13,6 +14,7 @@ const tabs=[
   {id:'schedule',label:'Расписание',number:'01'},
   {id:'posters',label:'Афиши',number:'02'},
   {id:'pages',label:'Страницы',number:'03'},
+  {id:'themes',label:'Темы оформления',number:'04'},
 ] as const;
 type EditorTab=(typeof tabs)[number]['id'];
 const activeTab=computed<EditorTab>(()=>{
@@ -224,6 +226,9 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
         </form>
         <p class="status-line">{{status}}</p><p v-if="error" class="editor-error" role="alert">{{error}}</p>
       </section>
+      </div>
+      <div id="editor-panel-themes" v-show="activeTab==='themes'" class="editor-tab-content" role="tabpanel" aria-labelledby="editor-tab-themes">
+        <VisitorThemeEditor :role="user.role" />
       </div>
     </section>
   </main>

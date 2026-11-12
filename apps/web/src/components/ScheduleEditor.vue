@@ -7,12 +7,10 @@ type Fields={label:string;group:string;leader:string;time:string;room:string;des
 type Card=Fields&{id:string;revision:number;published_revision:number|null;published:Fields|null;updated_at:string};
 const props=defineProps<{role:Role}>();
 const list=ref<Card[]>([]),id=ref(''),revision=ref(0),busy=ref(false),dirty=ref(false),status=ref('Загрузка…'),error=ref('');
-const newLabel=ref(''),newGroup=ref(''),newInherit=ref(true);
+const newLabel=ref(''),newGroup=ref('');
 function empty():Fields{return{label:'',group:'',leader:'',time:'',room:'',description:'',age:'',theme:'orange',inheritTheme:false,position:0};}
 const form=reactive<Fields>(empty());
 const current=computed(()=>list.value.find(x=>x.id===id.value)??null);
-const firstTheme=computed<Theme>(()=>list.value[0]?.theme??'orange');
-const visibleTheme=computed(()=>form.inheritTheme?firstTheme.value:form.theme);
 const headers={'Content-Type':'application/json','X-Navikultura-Action':'1'};
 let timer:ReturnType<typeof setTimeout>|undefined;
 let editSeq=0;
@@ -57,7 +55,7 @@ async function create(){if(props.role==='viewer'||busy.value||!await flush())ret
   busy.value=true;error.value='';
   try{const position=Math.min(1000000,(list.value.length?Math.max(...list.value.map(x=>x.position)):0)+10);
     const fields:Fields={...empty(),label:newLabel.value.trim(),group:newGroup.value.trim(),
-      inheritTheme:newInherit.value,theme:firstTheme.value,position};
+      inheritTheme:false,theme:'orange',position};
     const answer=await api<{item:Card}>('/api/editor/schedule',{method:'POST',headers,body:JSON.stringify({fields})});
     upsert(answer.item);apply(answer.item);newLabel.value='';newGroup.value='';status.value='Новая карточка создана. Добавьте данные и опубликуйте.';
   }catch(e){error.value=err(e);}finally{busy.value=false;}}
@@ -79,11 +77,11 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
   <section class="editor-panel schedule-manager">
     <div class="poster-editor-top"><div><span class="eyebrow">РАСПИСАНИЕ / БЕЗ EXCEL</span><h2>Коллективы и расписание</h2></div>
       <button type="button" class="secondary-button" :disabled="busy" @click="refresh">Обновить</button></div>
-    <p class="editor-hint">Одна карточка создаёт одну кнопку на экране. Автосохранение через 0,8 секунды; показ посетителям — после публикации.</p>
+    <p class="editor-hint">Одна карточка создаёт кнопку на экране. Автосохранение через 0,8 секунды; показ посетителям — после публикации. Внешний вид всего экрана настраивается во вкладке «Темы оформления».</p>
     <form v-if="role!=='viewer'" class="schedule-create" @submit.prevent="create">
       <label>Название кнопки<input v-model="newLabel" maxlength="70" placeholder="Например, Танцы" required /></label>
       <label>Коллектив<input v-model="newGroup" maxlength="140" placeholder="Например, Вдохновение" required /></label>
-      <label class="schedule-check"><input v-model="newInherit" type="checkbox" /> Оформление как у первой кнопки</label>
+
       <button class="primary-button" :disabled="busy" type="submit">+ Создать карточку</button>
     </form>
     <div class="schedule-manager-grid">
@@ -93,8 +91,8 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
         </button>
         <p v-if="!list.length" class="editor-hint">Пока нет карточек</p></aside>
       <div v-if="current" class="schedule-manager-details">
-        <div class="schedule-preview" :class="'theme-'+visibleTheme"><span class="eyebrow">ПРЕДПРОСМОТР</span>
-          <b>{{form.label||'Название кнопки'}}</b><small>{{form.time||form.group}}</small></div>
+        <div class="schedule-preview"><span class="eyebrow">ПРЕДПРОСМОТР</span>
+          <b>{{form.label||'Название кнопки'}}</b><small>{{form.time||form.group}}</small><small>Общая тема задаётся во вкладке «Темы оформления».</small></div>
         <div class="schedule-edit-fields">
           <label>Название кнопки<input v-model="form.label" maxlength="70" :disabled="role==='viewer'||busy" @input="change" /></label>
           <label>Название коллектива<input v-model="form.group" maxlength="140" :disabled="role==='viewer'||busy" @input="change" /></label>
@@ -102,9 +100,8 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
           <label>Расписание<input v-model="form.time" maxlength="200" placeholder="Пн, Ср · 16:00" :disabled="role==='viewer'||busy" @input="change" /></label>
           <label>Кабинет<input v-model="form.room" maxlength="80" :disabled="role==='viewer'||busy" @input="change" /></label>
           <label>Возраст<input v-model="form.age" maxlength="100" :disabled="role==='viewer'||busy" @input="change" /></label>
-          <label>Оформление<select v-model="form.theme" :disabled="role==='viewer'||busy||form.inheritTheme" @change="change"><option value="orange">Оранжевое</option><option value="blue">Синее</option><option value="neutral">Нейтральное</option></select></label>
           <label>Порядок<input v-model.number="form.position" type="number" min="0" max="1000000" :disabled="role==='viewer'||busy" @input="change" /></label>
-          <label class="schedule-check"><input v-model="form.inheritTheme" type="checkbox" :disabled="role==='viewer'||busy" @change="change" /> Наследовать оформление первой кнопки</label>
+
           <label class="schedule-description">Описание<textarea v-model="form.description" rows="4" maxlength="2500" :disabled="role==='viewer'||busy" @input="change"></textarea></label>
         </div>
         <div class="editor-actions">
