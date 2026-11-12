@@ -3,8 +3,9 @@ import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { createSessionToken, tokenHash, verifyPassword } from './crypto.js';
 import type { Account, PublicContent, Store } from './model.js';
 import { posterFileStream, type PosterRepository } from './posters.js';
+import type { ScheduleRepository } from './schedule.js';
 
-export interface AppOptions { store: Store; posters?: PosterRepository; cookieSecure?: boolean; allowedOrigin?: string }
+export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; cookieSecure?: boolean; allowedOrigin?: string }
 const MAX_AGE_S = 8 * 60 * 60;
 const ID = /^[a-z0-9_-]{1,80}$/i;
 const cookieName = (secure: boolean) => secure ? '__Host-navikultura_sid' : 'navikultura_dev_sid';
@@ -20,7 +21,7 @@ function userPublic(account: Account) {
 }
 export function createApp(options: AppOptions) {
   const app = Fastify({ logger: false, bodyLimit: 11_000_000 });
-  const { store, posters, cookieSecure = false, allowedOrigin } = options;
+  const { store, posters, schedule, cookieSecure = false, allowedOrigin } = options;
   const failedLogins = new Map<string, { count: number; windowStart: number }>();
   const mutating = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
   app.addHook('onRequest', async (request, reply) => {
@@ -46,7 +47,7 @@ export function createApp(options: AppOptions) {
     if (!roles.includes(account.role)) { reply.code(403).send({ error: 'Недостаточно прав' }); return null; }
     return account;
   }
-  app.get('/api/health', async () => ({ status: 'ok', service: 'navikultura-api', phase: 'stage-01' }));
+  app.get('/api/health', async () => ({ status: 'ok', service: 'navikultura-api', phase: 'stage-03' }));
   app.get('/api/public/navigation', async () => ({
     status: 'demo', sections: [
       { id: 'posters', title: 'Афиша' }, { id: 'schedule', title: 'Расписание' },
@@ -54,6 +55,10 @@ export function createApp(options: AppOptions) {
       { id: 'about', title: 'О ДК' }, { id: 'contacts', title: 'Контакты' },
     ],
   }));
+  app.get('/api/public/schedule', async (_request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    return schedule ? await schedule.list() : { entries: [], version:'none', updatedAt:null, stale:false, message:'Расписание ещё не настроено' };
+  });
   // Posters are discovered directly from the configured local folder.
   app.get('/api/public/posters', async (_request, reply) => {
     reply.header('Cache-Control', 'no-store');

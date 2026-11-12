@@ -29,3 +29,12 @@ Vue 3 + TypeScript + Vite, Fastify + Node.js 26, PostgreSQL 18.
 Stage 00 — опубликованная рабочая ветка; Stage 01 — кандидат для лабораторной проверки. Афиши и Excel будут реализованы на следующих этапах. Текущий редактор сохраняет только демонстрационную страницу `welcome`.
 
 Документация: `docs/STAGE01_ACCEPTANCE.md`, `docs/STAGE01_OBLAKO_PRECHECK.md`, `docs/ROADMAP.md`, `docs/SECURITY.md`.
+
+## Stage 03 — расписание из Excel
+
+1. Скопируйте `templates/Расписание_пример.xlsx` в `content/schedule/raspisanie.xlsx`.
+2. Запустите режим просмотра: `npm.cmd run dev:preview` и во втором терминале `npm.cmd run dev:web`.
+3. Откройте `http://127.0.0.1:5173/screen` и нажмите «Расписание».
+4. Отредактируйте таблицу Excel и сохраните: изменения отобразятся при следующем опросе (до 10 секунд).
+
+Инструкция и ограничения: `docs/EXCEL_SCHEDULE.md`. Для полноценного браузерного редактирования требуется локальная PostgreSQL из Stage 01.

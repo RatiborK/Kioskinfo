@@ -124,3 +124,16 @@ test('admin can upload and delete a verified poster, viewer cannot',async()=>{
     assert.deepEqual(admin.store.events,['login','poster.upload','poster.delete']);
   }finally{await admin.app.close();await rm(dir,{recursive:true,force:true});}
 });
+
+test('public schedule is available read-only even before PostgreSQL login', async()=>{
+  const sample={entries:[{id:'dance01',label:'Танцы',group:'Вдохновение',leader:'',time:'Пн 16:00',room:'201',description:'',age:'',theme:'orange'}],version:'fixture',updatedAt:null,stale:false,message:'ok'} as const;
+  const app=createApp({store:new MemoryStore(),schedule:{list:async()=>({entries:[...sample.entries],version:sample.version,updatedAt:sample.updatedAt,stale:sample.stale,message:sample.message})}});
+  try{
+    const res=await app.inject({method:'GET',url:'/api/public/schedule'});
+    assert.equal(res.statusCode,200);
+    assert.equal(res.headers['cache-control'],'no-store');
+    assert.equal(res.json().entries[0].id,'dance01');
+    const forbidden=await app.inject({method:'PATCH',url:'/api/editor/pages/page1',headers,payload:{title:'X',body:'Y',expectedRevision:1}});
+    assert.equal(forbidden.statusCode,401);
+  } finally {await app.close();}
+});

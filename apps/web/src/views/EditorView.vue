@@ -5,6 +5,17 @@ type Role = 'admin' | 'editor' | 'viewer';
 type Account = {id:string; username:string; displayName:string; role:Role};
 type Page = {id:string;slug:string;title:string;body:string;revision:number;published_revision:number|null};
 type Poster = {name:string;title:string;kind:'image'|'video';url:string;sizeBytes:number;updatedAt:string};
+type ScheduleEntry = {id:string;label:string;group:string;time:string;theme:string};
+const schedule = ref<ScheduleEntry[]>([]);
+const scheduleMessage = ref('');
+const scheduleStale = ref(false);
+async function loadSchedule(){
+  try{const response=await fetch('/api/public/schedule',{cache:'no-store'});
+    if(!response.ok)throw new Error('Не удалось прочитать расписание');
+    const data:{entries:ScheduleEntry[];message:string;stale:boolean}=await response.json();
+    schedule.value=data.entries;scheduleMessage.value=data.message;scheduleStale.value=data.stale;
+  }catch {scheduleMessage.value='Нет соединения с источником Excel';scheduleStale.value=true;}
+}
 const posters = ref<Poster[]>([]);
 const uploading = ref(false);
 const posterStatus = ref('');
@@ -36,7 +47,7 @@ async function removePoster(item:Poster){
   if(!window.confirm(`Удалить афишу «${item.title}»?`))return;
   posterError.value='';
   try {await api(`/api/editor/posters/${encodeURIComponent(item.name)}`,{method:'DELETE',headers,body:'{}'});
-    await loadPosters();posterStatus.value='Афиша удалена. Экран обновится автоматически.';
+    await Promise.all([loadPosters(),loadSchedule()]);posterStatus.value='Афиша удалена. Экран обновится автоматически.';
   }catch(e){posterError.value=String(e instanceof Error?e.message:e);}
 }
 const user = ref<Account|null>(null);
@@ -158,6 +169,14 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
             <span class="poster-editor-name">{{poster.title}}<small>{{(poster.sizeBytes/1024/1024).toFixed(2)}} МБ</small></span>
             <button v-if="user.role!=='viewer'" class="secondary-button" type="button" @click="removePoster(poster)">Удалить</button>
           </div>
+        </div>
+      </section>
+      <section class="editor-panel poster-editor">
+        <div class="poster-editor-top"><div><span class="eyebrow">EXCEL → КНОПКИ</span><h2>Расписание коллективов</h2></div><button type="button" class="secondary-button" @click="loadSchedule">Проверить файл</button></div>
+        <p class="editor-hint">Для изменения расписания отредактируйте <code>content/schedule/raspisanie.xlsx</code>. Один ряд создаёт кнопку и информационную страницу. ID сохраняйте неизменным при переименовании.</p>
+        <p class="status-line" :class="{'editor-error':scheduleStale}">{{scheduleMessage}}</p>
+        <div v-if="schedule.length" class="poster-editor-list">
+          <div v-for="item in schedule" :key="item.id" class="poster-editor-row"><span class="poster-editor-name">{{item.label}}<small>{{item.group}} · {{item.time}}</small></span><span class="eyebrow">{{item.theme}}</span></div>
         </div>
       </section>
       <aside class="editor-page-list"><h2>Страницы</h2><button v-for="page in pages" :key="page.id" class="editor-page-link" :class="{'current':page.id===selectedId}" @click="selectPage(page)">{{page.title}}</button></aside>
