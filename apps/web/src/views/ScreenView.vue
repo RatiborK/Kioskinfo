@@ -2,8 +2,9 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import {useRoute} from 'vue-router';
-import EventCalendar, {type PublicEvent} from '../components/EventCalendar.vue';
-import DocumentLibrary, {type Document} from '../components/DocumentLibrary.vue';
+import EventCalendar from '../components/EventCalendar.vue';
+import DocumentLibrary from '../components/DocumentLibrary.vue';
+import type {PublicEvent,PublicDocument as Document} from '../utils/content-types.js';
 import KioskKeyboard from '../components/KioskKeyboard.vue';
 import {filterSchedule} from '../utils/kiosk-search.js';
 import {visiblePosterWindow,shouldReturnHome} from '../utils/kiosk-behavior.js';
