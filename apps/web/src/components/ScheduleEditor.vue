@@ -3,16 +3,26 @@
 import { computed, onMounted, onBeforeUnmount, reactive, ref } from 'vue';
 type Theme='orange'|'blue'|'neutral';
 type Role='admin'|'editor'|'viewer';
-type Fields={label:string;group:string;leader:string;time:string;room:string;description:string;age:string;theme:Theme;inheritTheme:boolean;position:number};
+type Appearance={fill:'outline'|'solid';radius:'square'|'soft'|'pill';titleSize:'normal'|'large'|'huge';align:'left'|'center'};
+const defaultAppearance=():Appearance=>({fill:'outline',radius:'square',titleSize:'normal',align:'left'});
+type Fields={label:string;group:string;leader:string;time:string;room:string;description:string;age:string;theme:Theme;inheritTheme:boolean;position:number;appearance:Appearance};
 type Card=Fields&{id:string;revision:number;published_revision:number|null;published:Fields|null;updated_at:string};
 const props=defineProps<{role:Role}>();
 const list=ref<Card[]>([]),id=ref(''),revision=ref(0),busy=ref(false),dirty=ref(false),status=ref('Загрузка…'),error=ref('');
 const newLabel=ref(''),newGroup=ref(''),newInherit=ref(true);
-function empty():Fields{return{label:'',group:'',leader:'',time:'',room:'',description:'',age:'',theme:'orange',inheritTheme:false,position:0};}
+function empty():Fields{return{label:'',group:'',leader:'',time:'',room:'',description:'',age:'',theme:'orange',inheritTheme:false,position:0,appearance:defaultAppearance()};}
 const form=reactive<Fields>(empty());
 const current=computed(()=>list.value.find(x=>x.id===id.value)??null);
-const firstTheme=computed<Theme>(()=>list.value[0]?.theme??'orange');
-const visibleTheme=computed(()=>form.inheritTheme?firstTheme.value:form.theme);
+const isFirst=computed(()=>list.value[0]?.id===id.value);
+const firstStyle=computed(()=>{
+  const first=list.value[0];
+  return { theme: first?.id===id.value ? form.theme : (first?.theme??'orange'),
+    appearance: first?.id===id.value ? form.appearance : (first?.appearance??defaultAppearance()) };
+});
+const visibleTheme=computed(()=>form.inheritTheme&&!isFirst.value?firstStyle.value.theme:form.theme);
+const visibleAppearance=computed(()=>form.inheritTheme&&!isFirst.value?firstStyle.value.appearance:form.appearance);
+const appearanceClasses=computed(()=>['appearance-'+visibleAppearance.value.fill,
+  'radius-'+visibleAppearance.value.radius,'title-'+visibleAppearance.value.titleSize,'align-'+visibleAppearance.value.align]);
 const headers={'Content-Type':'application/json','X-Navikultura-Action':'1'};
 let timer:ReturnType<typeof setTimeout>|undefined;
 let editSeq=0;
@@ -27,7 +37,8 @@ function arrange(){list.value.sort((a,b)=>a.position-b.position||a.id.localeComp
 function upsert(row:Card){const index=list.value.findIndex(x=>x.id===row.id);if(index===-1)list.value.push(row);else list.value[index]=row;arrange();}
 function apply(row:Card){if(timer)clearTimeout(timer);id.value=row.id;revision.value=row.revision;
   Object.assign(form,{label:row.label,group:row.group,leader:row.leader,time:row.time,room:row.room,
-    description:row.description,age:row.age,theme:row.theme,inheritTheme:row.inheritTheme,position:row.position});
+    description:row.description,age:row.age,theme:row.theme,inheritTheme:row.inheritTheme,position:row.position,
+    appearance:{...(row.appearance??defaultAppearance())}});
   dirty.value=false;error.value='';status.value=row.published_revision===row.revision?'Опубликовано':'Черновик сохранён';}
 async function load(){busy.value=true;error.value='';try{
   const data=await api<{items:Card[]}>('/api/editor/schedule');list.value=data.items;arrange();
@@ -38,7 +49,7 @@ function change(){if(props.role==='viewer'||!id.value)return;editSeq++;dirty.val
 async function save():Promise<boolean>{
   if(!dirty.value)return true;
   if(busy.value||!id.value)return false;
-  const target=id.value,seq=editSeq,fields={...form},base=revision.value;
+  const target=id.value,seq=editSeq,fields={...form,appearance:{...form.appearance}},base=revision.value;
   busy.value=true;error.value='';status.value='Сохранение…';let result=false;
   try{const answer=await api<{item:Card}>(`/api/editor/schedule/${target}`,
     {method:'PATCH',headers,body:JSON.stringify({fields,expectedRevision:base})});upsert(answer.item);
@@ -57,7 +68,7 @@ async function create(){if(props.role==='viewer'||busy.value||!await flush())ret
   busy.value=true;error.value='';
   try{const position=Math.min(1000000,(list.value.length?Math.max(...list.value.map(x=>x.position)):0)+10);
     const fields:Fields={...empty(),label:newLabel.value.trim(),group:newGroup.value.trim(),
-      inheritTheme:newInherit.value,theme:firstTheme.value,position};
+      inheritTheme:newInherit.value&&list.value.length>0,theme:firstStyle.value.theme,appearance:{...firstStyle.value.appearance},position};
     const answer=await api<{item:Card}>('/api/editor/schedule',{method:'POST',headers,body:JSON.stringify({fields})});
     upsert(answer.item);apply(answer.item);newLabel.value='';newGroup.value='';status.value='Новая карточка создана. Добавьте данные и опубликуйте.';
   }catch(e){error.value=err(e);}finally{busy.value=false;}}
@@ -83,7 +94,7 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
     <form v-if="role!=='viewer'" class="schedule-create" @submit.prevent="create">
       <label>Название кнопки<input v-model="newLabel" maxlength="70" placeholder="Например, Танцы" required /></label>
       <label>Коллектив<input v-model="newGroup" maxlength="140" placeholder="Например, Вдохновение" required /></label>
-      <label class="schedule-check"><input v-model="newInherit" type="checkbox" /> Оформление как у первой кнопки</label>
+      <label class="schedule-check"><input v-model="newInherit" type="checkbox" /> Взять оформление первой кнопки целиком</label>
       <button class="primary-button" :disabled="busy" type="submit">+ Создать карточку</button>
     </form>
     <div class="schedule-manager-grid">
@@ -93,7 +104,7 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
         </button>
         <p v-if="!list.length" class="editor-hint">Пока нет карточек</p></aside>
       <div v-if="current" class="schedule-manager-details">
-        <div class="schedule-preview" :class="'theme-'+visibleTheme"><span class="eyebrow">ПРЕДПРОСМОТР</span>
+        <div class="schedule-preview" :class="['theme-'+visibleTheme,...appearanceClasses]"><span class="eyebrow">ПРЕДПРОСМОТР</span>
           <b>{{form.label||'Название кнопки'}}</b><small>{{form.time||form.group}}</small></div>
         <div class="schedule-edit-fields">
           <label>Название кнопки<input v-model="form.label" maxlength="70" :disabled="role==='viewer'||busy" @input="change" /></label>
@@ -102,9 +113,19 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
           <label>Расписание<input v-model="form.time" maxlength="200" placeholder="Пн, Ср · 16:00" :disabled="role==='viewer'||busy" @input="change" /></label>
           <label>Кабинет<input v-model="form.room" maxlength="80" :disabled="role==='viewer'||busy" @input="change" /></label>
           <label>Возраст<input v-model="form.age" maxlength="100" :disabled="role==='viewer'||busy" @input="change" /></label>
-          <label>Оформление<select v-model="form.theme" :disabled="role==='viewer'||busy||form.inheritTheme" @change="change"><option value="orange">Оранжевое</option><option value="blue">Синее</option><option value="neutral">Нейтральное</option></select></label>
+          <label>Цветовой шаблон<select v-model="form.theme" :disabled="role==='viewer'||busy||(form.inheritTheme&&!isFirst)" @change="change"><option value="orange">Оранжевое</option><option value="blue">Синее</option><option value="neutral">Нейтральное</option></select></label>
           <label>Порядок<input v-model.number="form.position" type="number" min="0" max="1000000" :disabled="role==='viewer'||busy" @input="change" /></label>
-          <label class="schedule-check"><input v-model="form.inheritTheme" type="checkbox" :disabled="role==='viewer'||busy" @change="change" /> Наследовать оформление первой кнопки</label>
+          <label class="schedule-check"><input v-model="form.inheritTheme" type="checkbox" :disabled="role==='viewer'||busy||isFirst" @change="change" /> Наследовать весь стиль первой кнопки</label>
+          <fieldset class="schedule-design" :disabled="role==='viewer'||busy||(form.inheritTheme&&!isFirst)">
+            <legend>Конструктор оформления кнопки</legend>
+            <div class="schedule-design-grid">
+              <label>Фон<select v-model="form.appearance.fill" @change="change"><option value="outline">Контур</option><option value="solid">Заливка цветом</option></select></label>
+              <label>Углы<select v-model="form.appearance.radius" @change="change"><option value="square">Прямые</option><option value="soft">Скруглённые</option><option value="pill">Сильно скруглённые</option></select></label>
+              <label>Заголовок<select v-model="form.appearance.titleSize" @change="change"><option value="normal">Обычный</option><option value="large">Крупный</option><option value="huge">Очень крупный</option></select></label>
+              <label>Выравнивание<select v-model="form.appearance.align" @change="change"><option value="left">По левому краю</option><option value="center">По центру</option></select></label>
+            </div>
+            <p v-if="form.inheritTheme&&!isFirst" class="editor-hint">Для собственного оформления снимите галочку наследования.</p>
+          </fieldset>
           <label class="schedule-description">Описание<textarea v-model="form.description" rows="4" maxlength="2500" :disabled="role==='viewer'||busy" @input="change"></textarea></label>
         </div>
         <div class="editor-actions">
