@@ -13,6 +13,7 @@ const form=reactive<Fields>(empty());
 const current=computed(()=>list.value.find(x=>x.id===id.value)??null);
 const headers={'Content-Type':'application/json','X-Navikultura-Action':'1'};
 let editSeq=0;
+let pendingSave:Promise<boolean>|null=null;
 async function api<T>(path:string,options:RequestInit={}):Promise<T>{
   const result=await fetch(path,{...options,credentials:'same-origin',cache:'no-store'});
   const body:unknown=await result.json();
@@ -32,7 +33,7 @@ async function load(){busy.value=true;error.value='';try{
   if(target)apply(target);else{id.value='';status.value='Создайте первую карточку';}
 }catch(e){error.value=err(e);}finally{busy.value=false;}}
 function change(){if(props.role==='viewer'||!id.value)return;editSeq++;dirty.value=true;error.value='';status.value='Есть изменения — сохранение после перехода в другое поле или по кнопке';}
-async function save():Promise<boolean>{
+async function persist():Promise<boolean>{
   if(!dirty.value)return true;
   if(!id.value)return false;
   if(busy.value)return false;
@@ -47,7 +48,20 @@ async function save():Promise<boolean>{
   finally{busy.value=false;}
   return result;
 }
-async function flush():Promise<boolean>{if(busy.value)return false;return dirty.value?save():true;}
+function save():Promise<boolean>{
+  if(pendingSave)return pendingSave.then(ok=>{
+    if(!ok&&error.value)return false;
+    return dirty.value?save():ok;
+  });
+  const task=persist();
+  pendingSave=task.finally(()=>{pendingSave=null;});
+  return pendingSave;
+}
+async function flush():Promise<boolean>{
+  if(pendingSave)await pendingSave;
+  if(error.value&&dirty.value)return false;
+  return dirty.value?save():true;
+}
 defineExpose({flush});
 async function select(row:Card){if(row.id!==id.value&&await flush())apply(row);}
 async function create(){if(props.role==='viewer'||busy.value||!await flush())return;
