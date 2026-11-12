@@ -1,0 +1,51 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Navikultura: API (watch)",
+      "type": "shell",
+      "command": "npm.cmd run dev:api",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Navikultura: Web (HMR)",
+      "type": "shell",
+      "command": "npm.cmd run dev:web",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Navikultura: Start API + Web",
+      "dependsOn": [
+        "Navikultura: API (watch)",
+        "Navikultura: Web (HMR)"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Navikultura: Run checks",
+      "type": "shell",
+      "command": "npm.cmd run check",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
