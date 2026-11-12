@@ -67,8 +67,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
       <section v-else class="hero" aria-live="polite">
         <div class="hero-overline"><i></i> ИНФОРМАЦИОННАЯ ПЛАТФОРМА</div>
         <h1>{{ selected.label }}<span class="dot">.</span></h1>
-        <p v-if="current === 'posters'">Скоро здесь появятся актуальные мероприятия, концерты и выставки Дворца культуры.</p>
-        <p v-else-if="current === 'schedule'">Расписание занятий и мероприятий будет формироваться автоматически из данных сотрудников.</p>
+        <p v-if="current === 'schedule'">Расписание занятий и мероприятий будет формироваться автоматически из данных сотрудников.</p>
         <p v-else-if="current === 'groups'">Информация о творческих коллективах, руководителях и направлениях.</p>
         <p v-else-if="current === 'navigation'">Поиск помещений и интерактивная навигация по зданию.</p>
         <p v-else-if="current === 'about'">{{ welcome?.body ?? 'Информация об учреждении и его деятельности.' }}</p>
