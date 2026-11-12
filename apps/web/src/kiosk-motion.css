@@ -21,6 +21,8 @@
 }
 .screen-shell .stage-note{margin-left:0}
 .screen-shell .screen-content [data-page-title]:focus{outline:none}
+.screen-shell .schedule-detail [data-schedule-title]:focus{outline:none}
+.screen-shell .schedule-detail [data-schedule-title]:focus-visible{outline:2px solid var(--v-alt);outline-offset:5px}
 .screen-shell .screen-content [data-page-title]:focus-visible{
   outline:2px solid var(--v-alt);outline-offset:5px
 }
@@ -45,7 +47,7 @@
     margin .38s ease,padding .38s ease,border-width .38s ease;
   max-height:650px
 }
-.kiosk-search-enter-from,.kiosk-search-leave-to{
+.screen-shell .kiosk-search-enter-from,.screen-shell .kiosk-search-leave-to{
   max-height:0;opacity:0;transform:translate3d(0,-14px,0);
   margin-top:0;margin-bottom:0;padding-top:0;padding-bottom:0;border-width:0
 }
