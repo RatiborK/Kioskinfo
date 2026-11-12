@@ -98,7 +98,15 @@ export class XlsxScheduleRepository implements ScheduleRepository {
   private goodHash = '';
   private serial: Promise<ScheduleCatalog> = Promise.resolve(this.snapshot);
   constructor(file = process.env.SCHEDULE_XLSX || defaultScheduleFile(),
-    private readonly reader: (path:string)=>Promise<ExcelCell[][]> = (path)=>readSheet(path)) { this.file = resolve(file); }
+    private readonly reader: (path:string)=>Promise<ExcelCell[][]> = async (path) => {
+      const rows = await readSheet(path);
+      return rows.map(row => row.map(cell => {
+        const value: unknown = cell;
+        if (value == null || typeof value === 'string' || typeof value === 'number' ||
+            typeof value === 'boolean' || value instanceof Date) return value;
+        throw new Error('В таблице обнаружен неподдерживаемый тип ячейки');
+      }));
+    }) { this.file = resolve(file); }
   list(): Promise<ScheduleCatalog> {
     // Concurrent kiosk requests must never parse the same incomplete workbook simultaneously.
     const task = this.serial.catch(() => this.snapshot).then(() => this.scan());
