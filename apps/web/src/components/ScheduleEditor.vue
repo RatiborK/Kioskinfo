@@ -13,12 +13,18 @@ const newLabel=ref(''),newGroup=ref(''),newInherit=ref(true);
 function empty():Fields{return{label:'',group:'',leader:'',time:'',room:'',description:'',age:'',theme:'orange',inheritTheme:false,position:0,appearance:defaultAppearance()};}
 const form=reactive<Fields>(empty());
 const current=computed(()=>list.value.find(x=>x.id===id.value)??null);
-const isFirst=computed(()=>list.value[0]?.id===id.value);
-const firstStyle=computed(()=>{
-  const first=list.value[0];
-  return { theme: first?.id===id.value ? form.theme : (first?.theme??'orange'),
-    appearance: first?.id===id.value ? form.appearance : (first?.appearance??defaultAppearance()) };
+// Public button inheritance follows the first *published* card and its published order.
+const templateCard=computed(()=>{
+  const published=list.value.filter(card=>card.published).sort((a,b)=>
+    (a.published?.position??a.position)-(b.published?.position??b.position)||
+    a.id.localeCompare(b.id));
+  return published[0]??list.value[0];
 });
+const isFirst=computed(()=>templateCard.value?.id===id.value);
+const firstStyle=computed(()=>({
+  theme:templateCard.value?.published?.theme??templateCard.value?.theme??'orange',
+  appearance:templateCard.value?.published?.appearance??templateCard.value?.appearance??defaultAppearance(),
+}));
 const visibleTheme=computed(()=>form.inheritTheme&&!isFirst.value?firstStyle.value.theme:form.theme);
 const visibleAppearance=computed(()=>form.inheritTheme&&!isFirst.value?firstStyle.value.appearance:form.appearance);
 const appearanceClasses=computed(()=>['appearance-'+visibleAppearance.value.fill,
@@ -124,7 +130,7 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
               <label>Заголовок<select v-model="form.appearance.titleSize" @change="change"><option value="normal">Обычный</option><option value="large">Крупный</option><option value="huge">Очень крупный</option></select></label>
               <label>Выравнивание<select v-model="form.appearance.align" @change="change"><option value="left">По левому краю</option><option value="center">По центру</option></select></label>
             </div>
-            <p v-if="form.inheritTheme&&!isFirst" class="editor-hint">Для собственного оформления снимите галочку наследования.</p>
+            <p v-if="form.inheritTheme&&!isFirst" class="editor-hint">Наследование использует стиль первой опубликованной кнопки. Для собственного оформления снимите галочку.</p>
           </fieldset>
           <label class="schedule-description">Описание<textarea v-model="form.description" rows="4" maxlength="2500" :disabled="role==='viewer'||busy" @input="change"></textarea></label>
         </div>
