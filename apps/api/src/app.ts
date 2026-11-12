@@ -2,8 +2,9 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { createSessionToken, tokenHash, verifyPassword } from './crypto.js';
 import type { Account, PublicContent, Store } from './model.js';
+import { posterFileStream, type PosterRepository } from './posters.js';
 
-export interface AppOptions { store: Store; cookieSecure?: boolean; allowedOrigin?: string }
+export interface AppOptions { store: Store; posters?: PosterRepository; cookieSecure?: boolean; allowedOrigin?: string }
 const MAX_AGE_S = 8 * 60 * 60;
 const ID = /^[a-z0-9_-]{1,80}$/i;
 const cookieName = (secure: boolean) => secure ? '__Host-navikultura_sid' : 'navikultura_dev_sid';
@@ -18,8 +19,8 @@ function userPublic(account: Account) {
   return { id: account.id, username: account.username, displayName: account.display_name, role: account.role };
 }
 export function createApp(options: AppOptions) {
-  const app = Fastify({ logger: false, bodyLimit: 300_000 });
-  const { store, cookieSecure = false, allowedOrigin } = options;
+  const app = Fastify({ logger: false, bodyLimit: 11_000_000 });
+  const { store, posters, cookieSecure = false, allowedOrigin } = options;
   const failedLogins = new Map<string, { count: number; windowStart: number }>();
   const mutating = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
   app.addHook('onRequest', async (request, reply) => {
@@ -53,6 +54,45 @@ export function createApp(options: AppOptions) {
       { id: 'about', title: 'О ДК' }, { id: 'contacts', title: 'Контакты' },
     ],
   }));
+  // Posters are discovered directly from the configured local folder.
+  app.get('/api/public/posters', async (_request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    return posters ? await posters.list() : { posters: [], ignored: 0 };
+  });
+  app.get<{ Params: { name: string } }>('/api/public/posters/:name/file', async (request, reply) => {
+    const media = await posters?.media(request.params.name);
+    if (!media) return reply.code(404).send({ error: 'Материал не найден' });
+    reply.header('Content-Type', media.mime);
+    reply.header('Cache-Control', 'no-store');
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('Content-Length', media.sizeBytes);
+    return reply.send(posterFileStream(media.filePath));
+  });
+  app.post<{ Body: { name?: string; base64?: string } }>('/api/editor/posters', async (request, reply) => {
+    const account = await requireRole(request, reply, ['admin','editor']);
+    if (!account) return;
+    if (!posters) return reply.code(503).send({ error: 'Папка афиш не настроена' });
+    if (typeof request.body?.name !== 'string' || typeof request.body?.base64 !== 'string')
+      return reply.code(400).send({ error: 'Укажите файл изображения' });
+    try {
+      const item = await posters.upload(request.body.name, request.body.base64);
+      await store.audit(account.id, 'poster.upload', { name: item.name, bytes: item.sizeBytes });
+      return reply.code(201).send({ poster: item });
+    } catch (error) {
+      if (error instanceof Error && ['INVALID_FILENAME','INVALID_MEDIA','UPLOAD_IMAGE_ONLY'].includes(error.message))
+        return reply.code(400).send({ error: 'Нужен корректный JPG, PNG или WebP размером до 8 МБ' });
+      throw error;
+    }
+  });
+  app.delete<{ Params: { name: string } }>('/api/editor/posters/:name', async (request, reply) => {
+    const account = await requireRole(request, reply, ['admin','editor']);
+    if (!account) return;
+    if (!posters) return reply.code(503).send({ error: 'Папка афиш не настроена' });
+    const removed = await posters.remove(request.params.name);
+    if (!removed) return reply.code(404).send({ error: 'Афиша не найдена' });
+    await store.audit(account.id, 'poster.delete', { name: request.params.name });
+    return { status: 'ok' };
+  });
   app.get<{ Params: { slug: string } }>('/api/public/pages/:slug', async (request, reply) => {
     if (!ID.test(request.params.slug)) return reply.code(400).send({ error: 'Некорректный адрес страницы' });
     const page = await store.getPublishedBySlug(request.params.slug);
