@@ -5,7 +5,7 @@ import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {FileScheduleRepository} from './schedule-file.js';
-import {defaultScheduleFields, publishedCatalog, validateScheduleFields} from './schedule.js';
+import {defaultAppearance, defaultScheduleFields, publishedCatalog, validateScheduleFields} from './schedule.js';
 
 test('create, autosave revision conflict, publish and restart persist correctly',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'navikultura-web-schedule-'));const path=join(dir,'records.json');
@@ -62,4 +62,57 @@ test('publishedCatalog publishes only snapshots and resolves first button theme'
   const catalog=publishedCatalog([row]);
   assert.equal(catalog.entries[0].theme,'blue');
   assert.equal(catalog.entries[0].label,'Вокал');
+});
+
+test('appearance presets are validated, copied on publish and inherited only from published snapshots',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-design-'));const path=join(dir,'records.json');
+  try {
+    const repo=new FileScheduleRepository(path);
+    const own=await repo.create({...defaultScheduleFields('Музыка','Оркестр'),position:10,theme:'blue',
+      appearance:{fill:'solid',radius:'soft',titleSize:'large',align:'center'}});
+    const inherited=await repo.create({...defaultScheduleFields('Танцы','Ритм'),position:20,inheritTheme:true,theme:'neutral',
+      appearance:{fill:'outline',radius:'square',titleSize:'normal',align:'left'}});
+    await repo.publish(own.id,1);await repo.publish(inherited.id,1);
+    let publicItems=(await repo.list()).entries;
+    assert.deepEqual(publicItems.map(x=>x.appearance),[{
+      fill:'solid',radius:'soft',titleSize:'large',align:'center'
+    },{
+      fill:'solid',radius:'soft',titleSize:'large',align:'center'
+    }]);
+    assert.deepEqual(publicItems.map(x=>x.theme),['blue','blue']);
+    const saved=await repo.save(own.id,1,{...own,theme:'orange',
+      appearance:{fill:'outline',radius:'pill',titleSize:'huge',align:'left'}});
+    assert.ok(saved);
+    publicItems=(await repo.list()).entries;
+    assert.equal(publicItems[1].theme,'blue');
+    assert.equal(publicItems[1].appearance.radius,'soft');
+    await repo.publish(own.id,saved!.revision);
+    publicItems=(await repo.list()).entries;
+    assert.deepEqual(publicItems.map(x=>x.appearance.radius),['pill','pill']);
+    assert.deepEqual(publicItems.map(x=>x.theme),['orange','orange']);
+    const restarted=new FileScheduleRepository(path);
+    assert.equal((await restarted.list()).entries[1].appearance.titleSize,'huge');
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('invalid appearance and unknown appearance keys are refused',()=>{
+  const example=defaultScheduleFields('Кино','Студия');
+  assert.throws(()=>validateScheduleFields({...example,appearance:{...defaultAppearance(),fill:'<script>'}}),/оформление/);
+  assert.throws(()=>validateScheduleFields({...example,appearance:{...defaultAppearance(),userCSS:'background:url(x)'}}),/оформление/);
+  assert.throws(()=>validateScheduleFields({...example,appearance:null}),/внешнего вида/);
+});
+test('legacy JSON without button appearance continues to load with safe defaults',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-legacy-design-'));const path=join(dir,'records.json');
+  try{
+    const repo=new FileScheduleRepository(path);
+    const row=await repo.create(defaultScheduleFields('Театр','Премьера'));
+    await repo.publish(row.id,1);
+    const raw=JSON.parse(await readFile(path,'utf8')) as Record<string,unknown>[];
+    delete raw[0].appearance;
+    const published=raw[0].published as Record<string,unknown>;
+    delete published.appearance;
+    await writeFile(path,JSON.stringify(raw));
+    const recovered=new FileScheduleRepository(path);
+    assert.deepEqual((await recovered.list()).entries[0].appearance,defaultAppearance());
+    assert.deepEqual((await recovered.listDrafts())[0].appearance,defaultAppearance());
+  }finally{await rm(dir,{recursive:true,force:true});}
 });
