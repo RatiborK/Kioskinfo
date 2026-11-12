@@ -53,7 +53,7 @@ export function defaultScheduleFields(label = 'Новый раздел', group =
     theme: 'orange', inheritTheme: false, position: 0 };
 }
 export function publishedCatalog(records: ScheduleRecord[], stale = false, message = ''): ScheduleCatalog {
-  const ordered = [...records].sort((a,b) => a.position - b.position || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
+  const ordered = [...records].sort((a,b) => (a.published?.position ?? a.position) - (b.published?.position ?? b.position) || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
   const visible = ordered.filter(row => row.published != null);
   const baseTheme = visible[0]?.published?.theme ?? 'orange';
   const entries: ScheduleEntry[] = visible.map(row => {
