@@ -16,7 +16,12 @@ type Poster = {name:string; title:string; kind:'image'|'video'; url:string; upda
 const posters = ref<Poster[]>([]);
 const posterIndex = ref(0);
 const posterError = ref('');
-type ScheduleEntry = { id:string;label:string;group:string;leader:string;time:string;room:string;description:string;age:string;theme:'orange'|'blue'|'neutral' };
+type Appearance={fill:'outline'|'solid';radius:'square'|'soft'|'pill';titleSize:'normal'|'large'|'huge';align:'left'|'center'};
+type ScheduleEntry = { id:string;label:string;group:string;leader:string;time:string;room:string;description:string;age:string;theme:'orange'|'blue'|'neutral';appearance?:Appearance };
+function buttonClasses(entry:ScheduleEntry):string[] {
+  const a=entry.appearance??{fill:'outline',radius:'square',titleSize:'normal',align:'left'};
+  return ['theme-'+entry.theme,'appearance-'+a.fill,'radius-'+a.radius,'title-'+a.titleSize,'align-'+a.align];
+}
 type SchedulePayload = {entries:ScheduleEntry[];version:string;stale:boolean;message:string};
 const schedule = ref<ScheduleEntry[]>([]);
 const selectedScheduleId = ref<string|null>(null);
@@ -84,7 +89,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1>{{current==='groups'?'Коллективы':'Расписание'}}<span class="dot">.</span></h1></div>
         <template v-if="selectedSchedule">
           <button type="button" class="schedule-back" @click="selectedScheduleId=null">← Все направления</button>
-          <article class="schedule-detail" :class="'theme-'+selectedSchedule.theme">
+          <article class="schedule-detail" :class="['theme-'+selectedSchedule.theme,'radius-'+(selectedSchedule.appearance?.radius??'square')]">
             <span class="eyebrow">КАРТОЧКА КОЛЛЕКТИВА</span>
             <h2>{{selectedSchedule.group}}</h2>
             <div class="schedule-detail-rows">
@@ -99,7 +104,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         <template v-else-if="schedule.length">
           <p class="schedule-hint">Выберите направление, чтобы посмотреть руководителя, дни занятий и кабинет.</p>
           <div class="schedule-buttons">
-            <button v-for="entry in schedule" :key="entry.id" type="button" class="schedule-button" :class="'theme-'+entry.theme" @click="selectedScheduleId=entry.id">
+            <button v-for="entry in schedule" :key="entry.id" type="button" class="schedule-button" :class="buttonClasses(entry)" @click="selectedScheduleId=entry.id">
               <strong>{{entry.label}}</strong><span>{{entry.time||entry.group}}</span><span class="schedule-arrow">↗</span>
             </button>
           </div>
