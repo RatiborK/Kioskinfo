@@ -4,17 +4,22 @@ import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import ScheduleEditor from '../components/ScheduleEditor.vue';
 import VisitorThemeEditor from '../components/VisitorThemeEditor.vue';
+import EventEditor from '../components/EventEditor.vue';
+import DocumentEditor from '../components/DocumentEditor.vue';
 type Role = 'admin' | 'editor' | 'viewer';
 type Account = {id:string; username:string; displayName:string; role:Role};
 type Page = {id:string;slug:string;title:string;body:string;revision:number;published_revision:number|null};
 type Poster = {name:string;title:string;kind:'image'|'video';url:string;sizeBytes:number;updatedAt:string};
 const scheduleEditor = ref<{flush:()=>Promise<boolean>}|null>(null);
+const eventEditor=ref<{flush:()=>Promise<boolean>}|null>(null);
 const route=useRoute(),router=useRouter();
 const tabs=[
   {id:'schedule',label:'Расписание',number:'01'},
   {id:'posters',label:'Афиши',number:'02'},
   {id:'pages',label:'Страницы',number:'03'},
   {id:'themes',label:'Темы оформления',number:'04'},
+  {id:'calendar',label:'Календарь',number:'05'},
+  {id:'documents',label:'Документы',number:'06'},
 ] as const;
 type EditorTab=(typeof tabs)[number]['id'];
 const activeTab=computed<EditorTab>(()=>{
@@ -143,6 +148,7 @@ async function changeTab(next:EditorTab):Promise<boolean>{
   if(busy.value||uploading.value)return false;
   if(activeTab.value==='pages'&&changed){await save();if(changed||busy.value)return false;}
   if(activeTab.value==='schedule'&&scheduleEditor.value&&!await scheduleEditor.value.flush())return false;
+  if(activeTab.value==='calendar'&&eventEditor.value&&!await eventEditor.value.flush())return false;
   await router.replace({path:route.path,query:{...route.query,tab:next}});
   return true;
 }
@@ -188,6 +194,7 @@ onBeforeUnmount(()=>{
         <button class="primary-button" :disabled="busy" type="submit">Войти</button>
       </form>
       <p v-if="error" class="editor-error" role="alert">{{error}}</p>
+      <p class="editor-hint">Если не выполнять действий в течение трёх минут, страница входа вернётся на экран посетителя.</p>
     </section>
     <section v-else class="editor-dashboard">
       <div class="editor-dashboard-bar">
@@ -242,6 +249,12 @@ onBeforeUnmount(()=>{
       </div>
       <div id="editor-panel-themes" v-show="activeTab==='themes'" class="editor-tab-content" role="tabpanel" aria-labelledby="editor-tab-themes">
         <VisitorThemeEditor :role="user.role" />
+      </div>
+      <div id="editor-panel-calendar" v-show="activeTab==='calendar'" class="editor-tab-content" role="tabpanel" aria-labelledby="editor-tab-calendar">
+        <EventEditor ref="eventEditor" :role="user.role"/>
+      </div>
+      <div id="editor-panel-documents" v-show="activeTab==='documents'" class="editor-tab-content" role="tabpanel" aria-labelledby="editor-tab-documents">
+        <DocumentEditor :role="user.role"/>
       </div>
     </section>
   </main>
