@@ -102,3 +102,30 @@
 .editor-tab-content .schedule-manager,.editor-tab-content .poster-editor{grid-column:auto}
 @media(max-width:850px){.editor-pages-layout{grid-template-columns:1fr}.editor-dashboard-bar{align-items:flex-start;flex-direction:column}.editor-dashboard-user{justify-content:space-between;width:100%}}
 @media(max-width:560px){.editor-tabs button{min-width:120px;padding:13px 15px;font-size:15px;gap:8px}.editor-tabs-number{font-size:10px}.editor-dashboard{padding-top:14px}}
+
+
+/* Stage 04.1 — constrained visual button designer (no inline CSS or arbitrary styles). */
+.schedule-design{grid-column:1/-1;border:1px solid var(--line);padding:20px 22px;background:#111;min-width:0}
+.schedule-design legend{font-size:16px;font-weight:750;padding:0 9px;color:var(--warm)}
+.schedule-design-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.schedule-design-grid label{min-width:0}
+.schedule-design:disabled{opacity:.6}
+.schedule-design select:disabled{cursor:not-allowed}
+.schedule-preview.radius-square,.schedule-button.radius-square,.schedule-detail.radius-square{border-radius:0}
+.schedule-preview.radius-soft,.schedule-button.radius-soft,.schedule-detail.radius-soft{border-radius:16px}
+.schedule-preview.radius-pill,.schedule-button.radius-pill,.schedule-detail.radius-pill{border-radius:36px}
+.schedule-preview.align-center,.schedule-button.align-center{align-items:center;text-align:center}
+.schedule-preview.align-left,.schedule-button.align-left{align-items:flex-start;text-align:left}
+.schedule-preview.title-normal b,.schedule-button.title-normal strong{font-size:clamp(20px,2vw,29px)}
+.schedule-preview.title-large b,.schedule-button.title-large strong{font-size:clamp(26px,2.5vw,38px)}
+.schedule-preview.title-huge b,.schedule-button.title-huge strong{font-size:clamp(32px,3.1vw,46px)}
+.schedule-button.title-huge{min-height:190px}
+.schedule-preview.title-huge{min-height:170px}
+.schedule-button.appearance-solid.theme-orange,.schedule-preview.appearance-solid.theme-orange{background:var(--orange);border-color:var(--orange);color:#080808}
+.schedule-button.appearance-solid.theme-blue,.schedule-preview.appearance-solid.theme-blue{background:var(--blue);border-color:var(--blue);color:#fff}
+.schedule-button.appearance-solid.theme-neutral,.schedule-preview.appearance-solid.theme-neutral{background:#777;border-color:#999;color:#fff}
+.schedule-preview.appearance-solid .eyebrow{color:inherit;opacity:.72}
+.schedule-button.appearance-solid:hover,.schedule-button.appearance-solid:focus-visible{filter:brightness(1.12)}
+.schedule-button.appearance-outline{background:#202022;color:#fff}
+.schedule-preview.appearance-outline{background:#222;color:#fff}
+@media(max-width:560px){.schedule-design-grid{grid-template-columns:1fr}.schedule-preview.radius-pill,.schedule-button.radius-pill{border-radius:24px}}
