@@ -123,7 +123,7 @@ function focusCurrentPage(){
 function toggleSearch(){
   noteActivity();
   if(current.value==='groups'){directoryRef.value?.toggleSearch();return;}
-  if(current.value!=='schedule'&&current.value!=='groups'){
+  if(current.value!=='schedule'){
     selectedScheduleId.value=null;
     keyboardOpen.value=false;
     searchQuery.value='';
@@ -229,7 +229,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         <p v-if="posterError" class="poster-warning" role="status">{{posterError}}</p>
       </section>
       <section v-else-if="current==='schedule'" class="schedule-section" aria-live="polite">
-        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1 data-page-title tabindex="-1">{{current==='groups'?'Коллективы':'Расписание'}}<span class="dot">.</span></h1></div>
+        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1 data-page-title tabindex="-1">Расписание<span class="dot">.</span></h1></div>
         <Transition name="kiosk-detail" mode="out-in" @after-enter="focusSchedulePanel">
           <div v-if="selectedSchedule" :key="'detail:'+selectedSchedule.id" class="schedule-detail-layout">
           <button type="button" class="schedule-back" @click="backToSchedule">← Все направления</button>
