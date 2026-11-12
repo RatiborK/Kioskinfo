@@ -66,6 +66,7 @@ const pages = ref<Page[]>([]); const selectedId = ref('');
 const title = ref(''); const body = ref(''); const revision = ref(0);
 const status = ref('Подключение…'); const busy = ref(false); const error = ref('');
 let changed = false;
+let pendingPageSave:Promise<void>|null=null;
 const headers = {'Content-Type':'application/json','X-Navikultura-Action':'1'};
 async function api(path:string, init:RequestInit={}) {
   const res=await fetch(path,{...init,credentials:'same-origin',cache:'no-store'});
@@ -89,13 +90,11 @@ async function refreshSession(){
   catch {user.value=null;status.value='Войдите для редактирования';}
 }
 async function selectPage(page:Page) {
-  if(busy.value)return;
-  if(changed){await save();if(changed)return;}
+  if(!await flushPage())return;
   usePage(pages.value.find(p=>p.id===page.id)||page);
 }
 async function reloadPages(){
-  if(busy.value)return;
-  if(changed){await save();if(changed)return;}
+  if(!await flushPage())return;
   await loadPages();
 }
 async function login(){
@@ -105,8 +104,7 @@ async function login(){
   catch(e){error.value=String(e instanceof Error?e.message:e)} finally {busy.value=false;}
 }
 async function logout(){
-  if(busy.value)return;
-  if(changed){await save();if(changed)return;}
+  if(!await flushPage())return;
   if(scheduleEditor.value && !(await scheduleEditor.value.flush()))return;
   try{await api('/api/auth/logout',{method:'POST',headers,body:'{}'});}finally{user.value=null;pages.value=[];selectedId.value='';}
 }
@@ -115,7 +113,7 @@ function changedField(){
   changed=true;status.value='Ожидает сохранения…';
 
 }
-async function save(){
+async function persistPage(){
   if(!changed||busy.value||!selectedId.value)return;
   const snapshot={title:title.value,body:body.value,expectedRevision:revision.value};
   const requestedRevision=revision.value;
@@ -133,9 +131,21 @@ async function save(){
     status.value=requestedRevision===revision.value?'Ошибка сохранения — изменения остались в форме':'Ошибка синхронизации';
   }finally{busy.value=false;}
 }
+function save():Promise<void>{
+  if(pendingPageSave)return pendingPageSave.then(()=>{
+    if(changed&&!error.value)return save();
+  });
+  const task=persistPage();
+  pendingPageSave=task.finally(()=>{pendingPageSave=null;});
+  return pendingPageSave;
+}
+async function flushPage():Promise<boolean>{
+  if(pendingPageSave)await pendingPageSave;
+  if(changed&&!error.value)await save();
+  return !changed&&!busy.value;
+}
 async function publish(){
-  if(busy.value)return;
-  if(changed){await save(); if(changed)return;}
+  if(!await flushPage())return;
   busy.value=true;error.value='';
   try {const data:{page:Page}=await api(`/api/editor/pages/${selectedId.value}/publish`,{method:'POST',headers,body:JSON.stringify({expectedRevision:revision.value})});
     const index=pages.value.findIndex(p=>p.id===selectedId.value);if(index>=0)pages.value[index]=data.page;
@@ -146,7 +156,7 @@ async function publish(){
 async function changeTab(next:EditorTab):Promise<boolean>{
   if(next===activeTab.value)return true;
   if(busy.value||uploading.value)return false;
-  if(activeTab.value==='pages'&&changed){await save();if(changed||busy.value)return false;}
+  if(activeTab.value==='pages'&&!await flushPage())return false;
   if(activeTab.value==='schedule'&&scheduleEditor.value&&!await scheduleEditor.value.flush())return false;
   if(activeTab.value==='calendar'&&eventEditor.value&&!await eventEditor.value.flush())return false;
   await router.replace({path:route.path,query:{...route.query,tab:next}});
