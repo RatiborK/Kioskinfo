@@ -7,6 +7,7 @@ import EditorView from './views/EditorView.vue';
 import './styles.css';
 import './visitor-themes.css';
 import './kiosk-motion.css';
+import './cultural-content.css';
 
 const router = createRouter({
   history: createWebHistory(),
