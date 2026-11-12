@@ -3,7 +3,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { createSessionToken, tokenHash, verifyPassword } from './crypto.js';
 import type { Account, PublicContent, Store } from './model.js';
 import { posterFileStream, type PosterRepository } from './posters.js';
-import type { ScheduleRepository } from './schedule.js';
+import { validateScheduleFields, type ScheduleRepository } from './schedule.js';
 
 export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; cookieSecure?: boolean; allowedOrigin?: string }
 const MAX_AGE_S = 8 * 60 * 60;
@@ -58,6 +58,62 @@ export function createApp(options: AppOptions) {
   app.get('/api/public/schedule', async (_request, reply) => {
     reply.header('Cache-Control', 'no-store');
     return schedule ? await schedule.list() : { entries: [], version:'none', updatedAt:null, stale:false, message:'Расписание ещё не настроено' };
+  });
+  // Browser schedule editor: drafts are private, only published snapshots reach the kiosk.
+  app.get('/api/editor/schedule', async (request, reply) => {
+    const account = await requireRole(request, reply, ['admin','editor','viewer']);
+    if (!account) return;
+    if (!schedule) return reply.code(503).send({ error:'Расписание не настроено' });
+    reply.header('Cache-Control','no-store');
+    return { items: await schedule.listDrafts() };
+  });
+  app.post<{ Body: {fields?: unknown} }>('/api/editor/schedule', async (request, reply) => {
+    const account = await requireRole(request, reply, ['admin','editor']);
+    if (!account) return;
+    if (!schedule) return reply.code(503).send({ error:'Расписание не настроено' });
+    let fields;
+    try { fields = validateScheduleFields(request.body?.fields); }
+    catch(e) { return reply.code(400).send({error: e instanceof Error ? e.message : 'Некорректные поля'}); }
+    const item = await schedule.create(fields);
+    await store.audit(account.id,'schedule.create',{id:item.id});
+    reply.header('Cache-Control','no-store');
+    return reply.code(201).send({item});
+  });
+  app.patch<{ Params:{id:string}; Body:{expectedRevision?:number;fields?:unknown} }>('/api/editor/schedule/:id', async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin','editor']);
+    if(!account)return;
+    if(!schedule)return reply.code(503).send({error:'Расписание не настроено'});
+    if(!ID.test(request.params.id)||!Number.isSafeInteger(request.body?.expectedRevision)||Number(request.body?.expectedRevision)<1)
+      return reply.code(400).send({error:'Неверный ID или версия записи'});
+    let fields;
+    try {fields=validateScheduleFields(request.body?.fields);}
+    catch(e) {return reply.code(400).send({error:e instanceof Error?e.message:'Некорректные поля'});}
+    const item=await schedule.save(request.params.id,Number(request.body.expectedRevision),fields);
+    if(!item)return reply.code(409).send({error:'Карточка уже изменена или удалена. Сначала обновите список'});
+    await store.audit(account.id,'schedule.save',{id:item.id,revision:item.revision});
+    reply.header('Cache-Control','no-store');return {item};
+  });
+  app.post<{ Params:{id:string}; Body:{expectedRevision?:number} }>('/api/editor/schedule/:id/publish',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin','editor']);
+    if(!account)return;
+    if(!schedule)return reply.code(503).send({error:'Расписание не настроено'});
+    if(!ID.test(request.params.id)||!Number.isSafeInteger(request.body?.expectedRevision)||Number(request.body?.expectedRevision)<1)
+      return reply.code(400).send({error:'Неверная версия карточки'});
+    const item=await schedule.publish(request.params.id,Number(request.body.expectedRevision));
+    if(!item)return reply.code(409).send({error:'Карточка изменилась. Обновите список'});
+    await store.audit(account.id,'schedule.publish',{id:item.id,revision:item.revision});
+    reply.header('Cache-Control','no-store');return {item};
+  });
+  app.delete<{ Params:{id:string}; Body:{expectedRevision?:number} }>('/api/editor/schedule/:id',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin']);
+    if(!account)return;
+    if(!schedule)return reply.code(503).send({error:'Расписание не настроено'});
+    if(!ID.test(request.params.id)||!Number.isSafeInteger(request.body?.expectedRevision)||Number(request.body?.expectedRevision)<1)
+      return reply.code(400).send({error:'Неверная версия карточки'});
+    const removed=await schedule.archive(request.params.id,Number(request.body.expectedRevision));
+    if(!removed)return reply.code(409).send({error:'Карточка уже изменена. Обновите список'});
+    await store.audit(account.id,'schedule.delete',{id:request.params.id});
+    return {status:'ok'};
   });
   // Posters are discovered directly from the configured local folder.
   app.get('/api/public/posters', async (_request, reply) => {

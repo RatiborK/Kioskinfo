@@ -5,6 +5,8 @@ import { createApp } from './app.js';
 import { hashPassword, tokenHash, verifyPassword } from './crypto.js';
 import type { Account, Page, PublicContent, Session, Store } from './model.js';
 import { FolderPosterRepository } from './posters.js';
+import { FileScheduleRepository } from './schedule-file.js';
+import { defaultScheduleFields, type ScheduleRepository } from './schedule.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,9 +30,9 @@ class MemoryStore implements Store {
 }
 const headers={'content-type':'application/json','x-navikultura-action':'1'};
 const loginBody=(username:string,password:string)=>({method:'POST' as const,url:'/api/auth/login',headers,payload:{username,password}});
-async function fixture(role:'admin'|'editor'|'viewer'='admin', posters?:FolderPosterRepository){
+async function fixture(role:'admin'|'editor'|'viewer'='admin', posters?:FolderPosterRepository, schedule?:ScheduleRepository){
   const store=new MemoryStore();store.accounts=[{id:'account1',username:'worker',display_name:'Сотрудник',role,password_hash:await hashPassword('some-strong-password-123'),enabled:true}];
-  const app=createApp({store,posters,allowedOrigin:'http://127.0.0.1:5173'});
+  const app=createApp({store,posters,schedule,allowedOrigin:'http://127.0.0.1:5173'});
   const login=await app.inject(loginBody('worker','some-strong-password-123'));
   assert.equal(login.statusCode,200);
   const cookie=login.headers['set-cookie'];assert.equal(typeof cookie,'string');
@@ -125,15 +127,41 @@ test('admin can upload and delete a verified poster, viewer cannot',async()=>{
   }finally{await admin.app.close();await rm(dir,{recursive:true,force:true});}
 });
 
-test('public schedule is available read-only even before PostgreSQL login', async()=>{
-  const sample={entries:[{id:'dance01',label:'Танцы',group:'Вдохновение',leader:'',time:'Пн 16:00',room:'201',description:'',age:'',theme:'orange'}],version:'fixture',updatedAt:null,stale:false,message:'ok'} as const;
-  const app=createApp({store:new MemoryStore(),schedule:{list:async()=>({entries:[...sample.entries],version:sample.version,updatedAt:sample.updatedAt,stale:sample.stale,message:sample.message})}});
+test('schedule API rejects guests, hides drafts, and publishes only authorized updates',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-schedule-api-'));
   try{
-    const res=await app.inject({method:'GET',url:'/api/public/schedule'});
-    assert.equal(res.statusCode,200);
-    assert.equal(res.headers['cache-control'],'no-store');
-    assert.equal(res.json().entries[0].id,'dance01');
-    const forbidden=await app.inject({method:'PATCH',url:'/api/editor/pages/page1',headers,payload:{title:'X',body:'Y',expectedRevision:1}});
-    assert.equal(forbidden.statusCode,401);
-  } finally {await app.close();}
+    const schedule=new FileScheduleRepository(join(dir,'records.json'));
+    const admin=await fixture('admin',undefined,schedule);
+    try{
+      const forbidden=await admin.app.inject({method:'POST',url:'/api/editor/schedule',headers,
+        payload:{fields:defaultScheduleFields('Танцы','Вдохновение')}});
+      assert.equal(forbidden.statusCode,401);
+      const created=await admin.app.inject({method:'POST',url:'/api/editor/schedule',headers:{...headers,cookie:admin.cookie},
+        payload:{fields:defaultScheduleFields('Танцы','Вдохновение')}});
+      assert.equal(created.statusCode,201);
+      const item=created.json().item;
+      const invisible=await admin.app.inject({method:'GET',url:'/api/public/schedule'});
+      assert.equal(invisible.json().entries.length,0);
+      const saved=await admin.app.inject({method:'PATCH',url:'/api/editor/schedule/'+item.id,
+        headers:{...headers,cookie:admin.cookie},payload:{fields:{...item,leader:'Иванова'},expectedRevision:1}});
+      assert.equal(saved.statusCode,200);
+      const stale=await admin.app.inject({method:'PATCH',url:'/api/editor/schedule/'+item.id,
+        headers:{...headers,cookie:admin.cookie},payload:{fields:{...item,leader:'Неверно'},expectedRevision:1}});
+      assert.equal(stale.statusCode,409);
+      const pub=await admin.app.inject({method:'POST',url:'/api/editor/schedule/'+item.id+'/publish',
+        headers:{...headers,cookie:admin.cookie},payload:{expectedRevision:2}});
+      assert.equal(pub.statusCode,200);
+      const publicList=await admin.app.inject({method:'GET',url:'/api/public/schedule'});
+      assert.equal(publicList.json().entries[0].leader,'Иванова');
+      const removed=await admin.app.inject({method:'DELETE',url:'/api/editor/schedule/'+item.id,
+        headers:{...headers,cookie:admin.cookie},payload:{expectedRevision:2}});
+      assert.equal(removed.statusCode,200);
+      assert.equal((await admin.app.inject({method:'GET',url:'/api/public/schedule'})).json().entries.length,0);
+    }finally{await admin.app.close();}
+    const viewer=await fixture('viewer',undefined,schedule);
+    try{const no=await viewer.app.inject({method:'POST',url:'/api/editor/schedule',
+      headers:{...headers,cookie:viewer.cookie},payload:{fields:defaultScheduleFields('X','Y')}});
+      assert.equal(no.statusCode,403);
+    }finally{await viewer.app.close();}
+  }finally{await rm(dir,{recursive:true,force:true});}
 });

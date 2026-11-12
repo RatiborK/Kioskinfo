@@ -1,62 +1,65 @@
-// apps/api/src/schedule.test.ts — Excel fixture, style inheritance, atomic failure behavior.
+// apps/api/src/schedule.test.ts — browser-based schedule persistence, publication and fail-safe tests.
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { XlsxScheduleRepository, parseScheduleRows, type ExcelCell } from './schedule.js';
+import {test} from 'node:test';
+import {mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {FileScheduleRepository} from './schedule-file.js';
+import {defaultScheduleFields, publishedCatalog, validateScheduleFields} from './schedule.js';
 
-const columns = ['ID','Кнопка','Коллектив','Руководитель','Расписание','Кабинет','Описание','Возраст','Шаблон','Повторить стиль'];
-const row1 = ['dance01','Танцы','Вдохновение','Иванова','Пн, 16:00','201','О танцах','7+','синий','Нет'];
-test('each Excel row creates a unique button, optional fields and style inheritance work', () => {
-  const rows: ExcelCell[][] = [columns,row1,['voice01','Вокал','Гармония','','Вт, 18:00','112','','','','Да']];
-  const result = parseScheduleRows(rows);
-  assert.equal(result.length, 2);
-  assert.deepEqual(result.map(x=>[x.id,x.theme]),[['dance01','blue'],['voice01','blue']]);
-  assert.equal(result[1].leader,'');
-  assert.equal(result[1].time,'Вт, 18:00');
-});
-test('reject duplicate IDs, wrong template and missing headers', () => {
-  assert.throws(()=>parseScheduleRows([columns,row1,row1]),/повторяется ID/);
-  assert.throws(()=>parseScheduleRows([columns,[...row1.slice(0,8),'purple','Нет']]),/неизвестный шаблон/);
-  assert.throws(()=>parseScheduleRows([['ID','Кнопка'],['x1','Танцы']]),/Не найден столбец/);
-});
-test('real .xlsx is parsed and a damaged replacement does not destroy last accepted schedule', async () => {
-  const dir=await mkdtemp(join(tmpdir(),'navikultura-schedule-'));
-  try {
-    const target=join(dir,'raspisanie.xlsx');
-    const fixture=fileURLToPath(new URL('../../../templates/Расписание_пример.xlsx',import.meta.url));
-    await copyFile(fixture,target);
-    const repo=new XlsxScheduleRepository(target);
-    const first=await repo.list();
-    assert.equal(first.entries.length,3);
-    assert.equal(first.entries[2].theme,'blue');
-    assert.equal(first.stale,false);
-    assert.ok(first.version.length>8);
-    await writeFile(target,'this is not an xlsx');
-    const stale=await repo.list();
-    assert.equal(stale.stale,true);
-    assert.equal(stale.entries.length,3);
-    assert.equal(stale.version,first.version);
-    await copyFile(fixture,target);
-    const recovered=await repo.list();
-    assert.equal(recovered.stale,false);
-    assert.equal(recovered.entries.length,3);
-  } finally { await rm(dir,{recursive:true,force:true}); }
-});
-test('absent source is empty at first but never erases previously loaded schedule', async () => {
-  const dir=await mkdtemp(join(tmpdir(),'navikultura-schedule-'));
-  try {
-    const target=join(dir,'raspisanie.xlsx');
-    const repo=new XlsxScheduleRepository(target);
+test('create, autosave revision conflict, publish and restart persist correctly',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-web-schedule-'));const path=join(dir,'records.json');
+  try{
+    const repo=new FileScheduleRepository(path);
     assert.equal((await repo.list()).entries.length,0);
-    const fixture=fileURLToPath(new URL('../../../templates/Расписание_пример.xlsx',import.meta.url));
-    await copyFile(fixture,target);
-    assert.equal((await repo.list()).entries.length,3);
-    await rm(target);
-    const missing=await repo.list();
-    assert.equal(missing.entries.length,3);
-    assert.equal(missing.stale,true);
-  } finally {await rm(dir,{recursive:true,force:true});}
+    const first=await repo.create({...defaultScheduleFields('Танцы','Вдохновение'),position:10,theme:'blue'});
+    assert.equal(first.revision,1);
+    assert.equal((await repo.list()).entries.length,0); // never leak drafts
+    const saved=await repo.save(first.id,1,{...first,time:'Пн, Ср 16:00'});
+    assert.equal(saved?.revision,2);
+    assert.equal(await repo.save(first.id,1,{...first,time:'Invalid stale write'}),null);
+    const published=await repo.publish(first.id,2);
+    assert.equal(published?.published_revision,2);
+    assert.equal((await repo.list()).entries[0].time,'Пн, Ср 16:00');
+    const second=await repo.create({...defaultScheduleFields('Вокал','Гармония'),theme:'neutral',position:20,inheritTheme:true});
+    await repo.publish(second.id,1);
+    let visible=await repo.list();
+    assert.deepEqual(visible.entries.map(x=>x.theme),['blue','blue']);
+    // A draft change does not alter public content before publish.
+    const changed=await repo.save(first.id,2,{...saved!,theme:'orange'});
+    visible=await repo.list();assert.equal(visible.entries[0].theme,'blue');
+    await repo.publish(first.id,changed!.revision);
+    visible=await repo.list();assert.deepEqual(visible.entries.map(x=>x.theme),['orange','orange']);
+    const restarted=new FileScheduleRepository(path);
+    assert.equal((await restarted.list()).entries.length,2);
+    assert.equal(await restarted.archive(second.id,1),true);
+    assert.equal((await restarted.list()).entries.length,1);
+    assert.equal((await restarted.listDrafts()).length,1);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('invalid/corrupted local file never overwrites accepted public data',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-web-schedule-'));const path=join(dir,'records.json');
+  try{const repo=new FileScheduleRepository(path);
+    const record=await repo.create(defaultScheduleFields('Театр','Премьера'));
+    await repo.publish(record.id,1);const before=await repo.list();
+    await writeFile(path,'{bad JSON');
+    const after=await repo.list();assert.equal(after.stale,true);assert.equal(after.entries.length,1);
+    await assert.rejects(()=>repo.create(defaultScheduleFields('X','Y')));
+    assert.equal(await readFile(path,'utf8'),'{bad JSON');
+    assert.equal(after.version,before.version);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('validation rejects invalid themes, empty names, oversized data and order',()=>{
+  assert.throws(()=>validateScheduleFields({...defaultScheduleFields('','Коллектив')}),/Заполните/);
+  assert.throws(()=>validateScheduleFields({...defaultScheduleFields('Кнопка','Коллектив'),theme:'purple'}),/оформление/);
+  assert.throws(()=>validateScheduleFields({...defaultScheduleFields('Кнопка','Коллектив'),position:-1}),/Порядок/);
+  assert.throws(()=>validateScheduleFields({...defaultScheduleFields('Кнопка','Коллектив'),description:'A'.repeat(2600)}),/описание/);
+});
+test('publishedCatalog publishes only snapshots and resolves first button theme',()=>{
+  const fields=defaultScheduleFields('Вокал','Гармония');
+  const row={...fields,id:'x1',revision:2,published:{...fields,theme:'blue' as const},published_revision:1,
+    created_at:'2026-01-01T00:00:00Z',updated_at:'2026-01-01T00:00:00Z',published_at:'2026-01-01T00:00:00Z'};
+  const catalog=publishedCatalog([row]);
+  assert.equal(catalog.entries[0].theme,'blue');
+  assert.equal(catalog.entries[0].label,'Вокал');
 });

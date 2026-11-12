@@ -104,7 +104,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
             </button>
           </div>
         </template>
-        <div v-else class="poster-empty"><strong>Расписание появится автоматически</strong><p>Добавьте файл <code>content/schedule/raspisanie.xlsx</code> по шаблону — каждая строка создаст кнопку.</p></div>
+        <div v-else class="poster-empty"><strong>Расписание появится автоматически</strong><p>Сотрудник создаст карточки через раздел «Расписание» в веб-редакторе. Опубликованные карточки появятся здесь автоматически.</p></div>
         <p v-if="scheduleStatus" class="poster-warning" role="status">{{scheduleStatus}}</p>
       </section>
       <section v-else class="hero" aria-live="polite">

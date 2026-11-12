@@ -1,14 +1,18 @@
-# Локальная разработка VS Code
+# НавиКультура — локальная разработка в VS Code
 
-Основной компьютер разработчика: `%USERPROFILE%\Navikultura`. Сервер DESKTOP-OBLAKO не используется до приёмки.
+Изменяем проект на текущем ПК, не на сервере `DESKTOP-OBLAKO`.
 
-- Установить Node.js 26 LTS и Git.
-- `npm.cmd install --no-audit --no-fund` и `npm.cmd run check`.
-- **Terminal → Run Task → Navikultura: Start API + Web** — запускает API в read-only preview-режиме без PostgreSQL и Vite с HMR.
-- Просмотр: http://127.0.0.1:5173/screen
-- Редактор с правами и публикацией требует PostgreSQL Stage 01, отдельной задачи API (PostgreSQL).
-- Шаблон Excel: `templates/Расписание_пример.xlsx`; скопировать в `content/schedule/raspisanie.xlsx`.
-- Афиши: `content/posters/`.
-- VS Code Auto Save не равно Git commit: сохраняются только файлы, коммиты создаются осознанно.
-- Перед обновлением ветки проверить `git status --short`; при изменениях прекратить pull и разобраться, не применять force/reset.
-- В GitHub нельзя помещать реальные данные посетителей, сотрудников, пароли, `.env`, резервные копии.
+1. В каталоге `%USERPROFILE%\Navikultura` установить зависимости: `npm.cmd install --no-audit --no-fund`.
+2. Выполнить проверку: `npm.cmd run check`.
+3. В VS Code вызвать **Tasks: Run Task → Navikultura: Start API + Web**.
+4. В окне **API (preview)** появятся логин `admin` и случайный пароль. Не публиковать его в Git.
+5. Открыть `http://127.0.0.1:5173/editor`, войти и создавать карточки расписания.
+6. В соседней вкладке открыть `http://127.0.0.1:5173/screen` — кнопки появятся после публикации.
+
+Время автосохранения 800 мс. Vite автоматически обновляет Vue-интерфейс при сохранении файлов в VS Code.
+
+Файлы проекта и данные карточек разделены: `content/schedule/records.json` не отслеживается Git. Афиши сохраняются в `content/posters/`.
+
+**Важно:** локальный preview использует файловый репозиторий и временный пароль, работает только на 127.0.0.1. Для LAN-развёртывания нужен PostgreSQL и защищённый веб-сервер. Не меняйте `main` и рабочие службы `DESKTOP-OBLAKO` до завершения проверки.
+
+Никаких автоматических коммитов при каждом нажатии клавиши: сохраняйте контрольные версии в Git после прохождения проверок. Перед `git pull --ff-only` проверьте `git status --short`.
