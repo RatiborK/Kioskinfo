@@ -7,6 +7,7 @@ import type { Account, Page, PublicContent, Session, Store } from './model.js';
 import { FolderPosterRepository } from './posters.js';
 import { FileScheduleRepository } from './schedule-file.js';
 import { defaultScheduleFields, type ScheduleRepository } from './schedule.js';
+import { FileThemeRepository } from './themes.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -164,4 +165,58 @@ test('schedule API rejects guests, hides drafts, and publishes only authorized u
       assert.equal(no.statusCode,403);
     }finally{await viewer.app.close();}
   }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('visitor theme API authenticates writes and displays only the published choice',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-theme-api-'));
+  const themes=new FileThemeRepository(join(dir,'theme.json'));
+  const store=new MemoryStore();
+  store.accounts=[{id:'admint',username:'themesadmin',display_name:'Админ',role:'admin',
+    password_hash:await hashPassword('secure-test-password-2026'),enabled:true}];
+  const app=createApp({store,themes,allowedOrigin:'http://127.0.0.1:5173'});
+  try{
+    const initial=await app.inject({method:'GET',url:'/api/public/theme'});
+    assert.equal(initial.statusCode,200);assert.equal(initial.json().theme,'dk');
+    const anon=await app.inject({method:'PATCH',url:'/api/editor/theme',headers,payload:{id:'holiday',expectedRevision:1}});
+    assert.equal(anon.statusCode,401);
+    const login=await app.inject(loginBody('themesadmin','secure-test-password-2026'));
+    assert.equal(login.statusCode,200);
+    const cookie=String(login.headers['set-cookie']).split(';')[0];
+    const save=await app.inject({method:'PATCH',url:'/api/editor/theme',headers:{...headers,cookie},
+      payload:{id:'holiday',expectedRevision:1}});
+    assert.equal(save.statusCode,200);
+    assert.equal(save.json().settings.revision,2);
+    const old=await app.inject({method:'GET',url:'/api/public/theme'});
+    assert.equal(old.json().theme,'dk');
+    const conflict=await app.inject({method:'PATCH',url:'/api/editor/theme',headers:{...headers,cookie},
+      payload:{id:'neon',expectedRevision:1}});
+    assert.equal(conflict.statusCode,409);
+    const injection=await app.inject({method:'PATCH',url:'/api/editor/theme',headers:{...headers,cookie},
+      payload:{id:'<style>hack</style>',expectedRevision:2}});
+    assert.equal(injection.statusCode,400);
+    const publish=await app.inject({method:'POST',url:'/api/editor/theme/publish',headers:{...headers,cookie},
+      payload:{expectedRevision:2}});
+    assert.equal(publish.statusCode,200);
+    const active=await app.inject({method:'GET',url:'/api/public/theme'});
+    assert.equal(active.json().theme,'holiday');
+    assert.ok(store.events.includes('theme.select'));
+    assert.ok(store.events.includes('theme.publish'));
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
+});
+test('viewer cannot select or publish theme',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-theme-viewer-'));
+  const store=new MemoryStore();
+  store.accounts=[{id:'view1',username:'viewer',display_name:'Читатель',role:'viewer',
+    password_hash:await hashPassword('test-password-2026'),enabled:true}];
+  const app=createApp({store,themes:new FileThemeRepository(join(dir,'themes.json')),
+    allowedOrigin:'http://127.0.0.1:5173'});
+  try{
+    const login=await app.inject(loginBody('viewer','test-password-2026'));
+    const cookie=String(login.headers['set-cookie']).split(';')[0];
+    assert.equal((await app.inject({method:'GET',url:'/api/editor/theme',headers:{cookie}})).statusCode,200);
+    assert.equal((await app.inject({method:'PATCH',url:'/api/editor/theme',headers:{...headers,cookie},
+      payload:{id:'kids',expectedRevision:1}})).statusCode,403);
+    assert.equal((await app.inject({method:'POST',url:'/api/editor/theme/publish',headers:{...headers,cookie},
+      payload:{expectedRevision:1}})).statusCode,403);
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
 });
