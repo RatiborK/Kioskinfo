@@ -36,6 +36,12 @@ try {
   process.stdout.write('\n[LOCAL DEV ONLY] НавиКультура: http://127.0.0.1:5173/editor\n');
   process.stdout.write('Логин: admin\nПароль для текущего запуска: '+password+'\n');
   process.stdout.write('Данные расписания: content/schedule/records.json. Этот режим НЕ для локальной сети ДК.\n\n');
-} catch(error) {app.log.error(error);process.exitCode=1;await app.close();}
+} catch(error) {
+  const detail = error instanceof Error ? error.message : String(error);
+  process.stderr.write('[NAVIKULTURA DEV] Не удалось запустить API на 127.0.0.1:3100: ' + detail + '\n');
+  process.stderr.write('Проверьте порт 3100: возможно, предыдущий экземпляр API ещё запущен.\n');
+  process.exitCode=1;
+  await app.close();
+}
 process.once('SIGINT',()=>void app.close());
 process.once('SIGTERM',()=>void app.close());
