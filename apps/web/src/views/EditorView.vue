@@ -6,12 +6,14 @@ import ScheduleEditor from '../components/ScheduleEditor.vue';
 import VisitorThemeEditor from '../components/VisitorThemeEditor.vue';
 import EventEditor from '../components/EventEditor.vue';
 import DocumentEditor from '../components/DocumentEditor.vue';
+import CultureEditor from '../components/CultureEditor.vue';
 type Role = 'admin' | 'editor' | 'viewer';
 type Account = {id:string; username:string; displayName:string; role:Role};
 type Page = {id:string;slug:string;title:string;body:string;revision:number;published_revision:number|null};
 type Poster = {name:string;title:string;kind:'image'|'video';url:string;sizeBytes:number;updatedAt:string};
 const scheduleEditor = ref<{flush:()=>Promise<boolean>}|null>(null);
 const eventEditor=ref<{flush:()=>Promise<boolean>}|null>(null);
+const cultureEditor=ref<{flush:()=>Promise<boolean>}|null>(null);
 const route=useRoute(),router=useRouter();
 const tabs=[
   {id:'schedule',label:'Расписание',number:'01'},
@@ -20,6 +22,7 @@ const tabs=[
   {id:'themes',label:'Темы оформления',number:'04'},
   {id:'calendar',label:'Календарь',number:'05'},
   {id:'documents',label:'Документы',number:'06'},
+  {id:'culture',label:'Наполнение ДК',number:'07'},
 ] as const;
 type EditorTab=(typeof tabs)[number]['id'];
 const activeTab=computed<EditorTab>(()=>{
@@ -159,6 +162,7 @@ async function changeTab(next:EditorTab):Promise<boolean>{
   if(activeTab.value==='pages'&&!await flushPage())return false;
   if(activeTab.value==='schedule'&&scheduleEditor.value&&!await scheduleEditor.value.flush())return false;
   if(activeTab.value==='calendar'&&eventEditor.value&&!await eventEditor.value.flush())return false;
+  if(activeTab.value==='culture'&&cultureEditor.value&&!await cultureEditor.value.flush())return false;
   await router.replace({path:route.path,query:{...route.query,tab:next}});
   return true;
 }
@@ -265,6 +269,9 @@ onBeforeUnmount(()=>{
       </div>
       <div id="editor-panel-documents" v-show="activeTab==='documents'" class="editor-tab-content" role="tabpanel" aria-labelledby="editor-tab-documents">
         <DocumentEditor :role="user.role"/>
+      </div>
+      <div id="editor-panel-culture" v-show="activeTab==='culture'" class="editor-tab-content" role="tabpanel" aria-labelledby="editor-tab-culture">
+        <CultureEditor ref="cultureEditor" :role="user.role"/>
       </div>
     </section>
   </main>
