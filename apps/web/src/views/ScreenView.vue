@@ -1,6 +1,9 @@
-<!-- apps/web/src/views/ScreenView.vue — first visual prototype; no real posters yet. -->
+<!-- apps/web/src/views/ScreenView.vue — themed touchscreen interface with live posters and searchable schedule. -->
 <script setup lang="ts">
 import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
+import KioskKeyboard from '../components/KioskKeyboard.vue';
+import {filterSchedule} from '../utils/kiosk-search.js';
+import {visiblePosterWindow,shouldReturnHome} from '../utils/kiosk-behavior.js';
 
 const items = [
   { id: 'posters', label: 'Афиша', icon: '✦' },
@@ -32,6 +35,9 @@ type SchedulePayload = {entries:ScheduleEntry[];version:string;stale:boolean;mes
 const schedule = ref<ScheduleEntry[]>([]);
 const selectedScheduleId = ref<string|null>(null);
 const scheduleStatus = ref('');
+const searchQuery=ref('');
+const keyboardOpen=ref(false);
+const filteredSchedule=computed(()=>filterSchedule(schedule.value,searchQuery.value));
 const selectedSchedule = computed(()=>schedule.value.find(x=>x.id===selectedScheduleId.value) ?? null);
 async function reloadSchedule(){
   try {
@@ -45,6 +51,24 @@ async function reloadSchedule(){
 }
 let reloadHandle: ReturnType<typeof setInterval> | undefined;
 let slideshowHandle: ReturnType<typeof setInterval> | undefined;
+let idleHandle: ReturnType<typeof setInterval> | undefined;
+let lastActivity=Date.now();
+let lastManualPosterInput=0;
+const IDLE_RETURN_MS=180000;
+function noteActivity(){lastActivity=Date.now();}
+function changeSection(section:(typeof items)[number]['id']){
+  noteActivity();current.value=section;selectedScheduleId.value=null;keyboardOpen.value=false;
+  if(section!=='schedule'&&section!=='groups')searchQuery.value='';
+}
+function openSchedule(id:string){noteActivity();keyboardOpen.value=false;selectedScheduleId.value=id;}
+function backToSchedule(){noteActivity();selectedScheduleId.value=null;}
+function resetIfIdle(){
+  if(!shouldReturnHome(lastActivity,Date.now(),IDLE_RETURN_MS))return;
+  if(current.value!=='posters'||selectedScheduleId.value||keyboardOpen.value||searchQuery.value){
+    current.value='posters';selectedScheduleId.value=null;keyboardOpen.value=false;searchQuery.value='';
+    posterIndex.value=0;
+  }
+}
 async function reloadPosters(){
   try {
     const response = await fetch('/api/public/posters', {cache:'no-store'});
@@ -57,19 +81,29 @@ async function reloadPosters(){
     posterError.value='';
   }catch { posterError.value='Афиши пока недоступны. Отображается последняя полученная подборка.'; }
 }
-function nextPoster(){if(posters.value.length)posterIndex.value=(posterIndex.value+1)%posters.value.length;}
-function previousPoster(){if(posters.value.length)posterIndex.value=(posterIndex.value+posters.value.length-1)%posters.value.length;}
+function movePoster(direction:1|-1,manual=true){
+  if(manual){lastManualPosterInput=Date.now();noteActivity();}
+  if(posters.value.length)posterIndex.value=(posterIndex.value+posters.value.length+direction)%posters.value.length;
+}
 const activePoster=computed(()=>posters.value[posterIndex.value]);
+const posterThumbs=computed(()=>visiblePosterWindow(posters.value,posterIndex.value,6));
+function selectPoster(index:number){lastManualPosterInput=Date.now();noteActivity();posterIndex.value=index;}
 onMounted(async () => {
   await Promise.all([reloadPosters(),reloadSchedule(),reloadVisitorTheme()]);
   reloadHandle=setInterval(()=>{void reloadPosters();void reloadSchedule();void reloadVisitorTheme();},10000);
-  slideshowHandle=setInterval(()=>{if(activePoster.value?.kind!=='video')nextPoster();},8000);
+  slideshowHandle=setInterval(()=>{if(activePoster.value?.kind!=='video' && Date.now()-lastManualPosterInput>=12000)movePoster(1,false);},8000);
+  idleHandle=setInterval(resetIfIdle,12000);
+  window.addEventListener('pointerdown',noteActivity,{passive:true});
+  window.addEventListener('keydown',noteActivity);
   try { const response = await fetch('/api/public/pages/welcome', {cache:'no-store'});
     if (response.ok) {const data:{page:{title:string;body:string}} = await response.json(); welcome.value=data.page;}
   } catch { /* available only when API and DB are running */ }
 });
 const selected = computed(() => items.find((item) => item.id === current.value) ?? items[0]);
-onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHandle)clearInterval(slideshowHandle);});
+onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHandle)clearInterval(slideshowHandle);
+  if(idleHandle)clearInterval(idleHandle);
+  window.removeEventListener('pointerdown',noteActivity);window.removeEventListener('keydown',noteActivity);
+});
 </script>
 
 <template>
@@ -84,17 +118,26 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
         <div class="poster-heading"><span class="hero-overline">ПРОГРАММА МЕРОПРИЯТИЙ</span><h1>Афиша<span class="dot">.</span></h1></div>
         <div v-if="activePoster" class="poster-stage">
           <img v-if="activePoster.kind==='image'" class="poster-media" :src="activePoster.url" :alt="activePoster.title" />
-          <video v-else :key="activePoster.name" class="poster-media" :src="activePoster.url" autoplay muted playsinline controls @ended="nextPoster"></video>
+          <video v-else :key="activePoster.name" class="poster-media" :src="activePoster.url" autoplay muted playsinline controls @ended="movePoster(1,false)"></video>
           <div class="poster-caption"><strong>{{activePoster.title}}</strong><span>{{posterIndex+1}} / {{posters.length}}</span></div>
-          <div v-if="posters.length>1" class="poster-controls"><button type="button" aria-label="Предыдущая афиша" @click="previousPoster">‹</button><button type="button" aria-label="Следующая афиша" @click="nextPoster">›</button></div>
+          <div v-if="posters.length>1" class="poster-controls"><button type="button" aria-label="Предыдущая афиша" @click="movePoster(-1)">‹</button><button type="button" aria-label="Следующая афиша" @click="movePoster(1)">›</button></div>
         </div>
-        <div v-else class="poster-empty"><strong>Афиши появятся здесь автоматически</strong><p>Сотрудники могут добавить JPG, PNG или WebP через редактор или папку на сервере.</p></div>
+        <div v-if="posters.length>1" class="poster-filmstrip" aria-label="Выбор афиши">
+          <button v-for="item in posterThumbs" :key="item.poster.name" type="button" class="poster-thumbnail"
+            :class="{active:posterIndex===item.index}" :aria-current="posterIndex===item.index?'true':undefined"
+            :aria-label="'Афиша '+(item.index+1)+': '+item.poster.title" @click="selectPoster(item.index)">
+            <img v-if="item.poster.kind==='image'" :src="item.poster.url" alt="" loading="lazy" />
+            <span v-else class="poster-thumbnail-video">Видео</span>
+            <span class="poster-thumbnail-index">{{item.index+1}}</span>
+          </button>
+        </div>
+        <div v-if="!activePoster" class="poster-empty"><strong>Афиши появятся здесь автоматически</strong><p>Сотрудники могут добавить JPG, PNG или WebP через редактор или папку на сервере.</p></div>
         <p v-if="posterError" class="poster-warning" role="status">{{posterError}}</p>
       </section>
       <section v-else-if="current==='schedule'||current==='groups'" class="schedule-section" aria-live="polite">
         <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1>{{current==='groups'?'Коллективы':'Расписание'}}<span class="dot">.</span></h1></div>
         <template v-if="selectedSchedule">
-          <button type="button" class="schedule-back" @click="selectedScheduleId=null">← Все направления</button>
+          <button type="button" class="schedule-back" @click="backToSchedule">← Все направления</button>
           <article class="schedule-detail">
             <span class="eyebrow">КАРТОЧКА КОЛЛЕКТИВА</span>
             <h2>{{selectedSchedule.group}}</h2>
@@ -107,15 +150,39 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
             </div>
           </article>
         </template>
-        <template v-else-if="schedule.length">
-          <p class="schedule-hint">Выберите направление, чтобы посмотреть руководителя, дни занятий и кабинет.</p>
-          <div class="schedule-buttons">
-            <button v-for="entry in schedule" :key="entry.id" type="button" class="schedule-button" @click="selectedScheduleId=entry.id">
-              <strong>{{entry.label}}</strong><span>{{entry.time||entry.group}}</span><span class="schedule-arrow">↗</span>
-            </button>
+        <template v-else>
+          <div class="kiosk-search-panel" role="search" aria-label="Найти направление или коллектив">
+            <label for="schedule-search">Поиск по коллективам, руководителям и кабинетам</label>
+            <div class="kiosk-search-row">
+              <input id="schedule-search" v-model="searchQuery" type="search" maxlength="80"
+                autocomplete="off" spellcheck="false" placeholder="Например: Танцы, кабинет 210, руководитель"
+                @input="noteActivity" />
+              <button type="button" class="kiosk-search-keyboard-toggle" :aria-expanded="keyboardOpen" @click="keyboardOpen=!keyboardOpen">
+                {{keyboardOpen?'Скрыть клавиатуру':'⌨ Клавиатура'}}
+              </button>
+              <button v-if="searchQuery" type="button" class="kiosk-search-clear"
+                @click="searchQuery='';noteActivity()">Очистить</button>
+            </div>
+            <KioskKeyboard v-if="keyboardOpen" v-model="searchQuery" @close="keyboardOpen=false"/>
+            <p v-if="schedule.length" class="kiosk-search-count" role="status">
+              {{searchQuery.trim()?'Найдено: '+filteredSchedule.length+' из '+schedule.length:'Направлений: '+schedule.length}}
+            </p>
           </div>
+          <template v-if="filteredSchedule.length">
+            <p class="schedule-hint">Выберите направление, чтобы посмотреть руководителя, дни занятий и кабинет.</p>
+            <div class="schedule-buttons">
+              <button v-for="entry in filteredSchedule" :key="entry.id" type="button" class="schedule-button"
+                @click="openSchedule(entry.id)">
+                <strong>{{entry.label}}</strong><span>{{entry.time||entry.group}}</span><span class="schedule-arrow">↗</span>
+              </button>
+            </div>
+          </template>
+          <div v-else-if="schedule.length" class="kiosk-search-empty" role="status">
+            <strong>Ничего не найдено</strong><span>Попробуйте другое название, фамилию руководителя или кабинет.</span>
+            <button type="button" class="schedule-back" @click="searchQuery='';keyboardOpen=false">Показать все направления</button>
+          </div>
+          <div v-else class="poster-empty"><strong>Расписание появится автоматически</strong><p>Сотрудник создаст карточки через раздел «Расписание» в веб-редакторе. Опубликованные карточки появятся здесь автоматически.</p></div>
         </template>
-        <div v-else class="poster-empty"><strong>Расписание появится автоматически</strong><p>Сотрудник создаст карточки через раздел «Расписание» в веб-редакторе. Опубликованные карточки появятся здесь автоматически.</p></div>
         <p v-if="scheduleStatus" class="poster-warning" role="status">{{scheduleStatus}}</p>
       </section>
       <section v-else class="hero" aria-live="polite">
@@ -133,7 +200,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
     </div>
     <nav class="side-menu" aria-label="Разделы информационной системы">
       <span class="menu-title">РАЗДЕЛЫ</span>
-      <button v-for="(item,index) in items" :key="item.id" type="button" class="nav-item" :class="{active:current===item.id}" @click="current=item.id">
+      <button v-for="(item,index) in items" :key="item.id" type="button" class="nav-item" :class="{active:current===item.id}" @click="changeSection(item.id)">
         <span class="nav-index">{{ String(index+1).padStart(2,'0') }}</span><span class="nav-label">{{ item.label }}</span><span class="nav-glyph" aria-hidden="true">{{ item.icon }}</span>
       </button>
       <div class="menu-bottom">NAVIKULTURA / 2026</div>

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "typecheck": "vue-tsc --noEmit",
-    "build": "vue-tsc --noEmit && vite build"
+    "build": "vue-tsc --noEmit && vite build",
+    "test": "node --test src/utils/kiosk-search.test.ts src/utils/kiosk-behavior.test.ts"
   },
   "dependencies": {
     "vue": "^3.5.22",
