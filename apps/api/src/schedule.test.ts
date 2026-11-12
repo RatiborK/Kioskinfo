@@ -53,7 +53,7 @@ test('validation rejects invalid themes, empty names, oversized data and order',
   assert.throws(()=>validateScheduleFields({...defaultScheduleFields('','Коллектив')}),/Заполните/);
   assert.throws(()=>validateScheduleFields({...defaultScheduleFields('Кнопка','Коллектив'),theme:'purple'}),/оформление/);
   assert.throws(()=>validateScheduleFields({...defaultScheduleFields('Кнопка','Коллектив'),position:-1}),/Порядок/);
-  assert.throws(()=>validateScheduleFields({...defaultScheduleFields('Кнопка','Коллектив'),description:'A'.repeat(2600)}),/описание/);
+  assert.throws(()=>validateScheduleFields({...defaultScheduleFields('Кнопка','Коллектив'),description:'A'.repeat(2600)}),/Описание/);
 });
 test('publishedCatalog publishes only snapshots and resolves first button theme',()=>{
   const fields=defaultScheduleFields('Вокал','Гармония');
