@@ -134,7 +134,7 @@ onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHan
             <span class="poster-thumbnail-index">{{item.index+1}}</span>
           </button>
         </div>
-        <div v-else class="poster-empty"><strong>Афиши появятся здесь автоматически</strong><p>Сотрудники могут добавить JPG, PNG или WebP через редактор или папку на сервере.</p></div>
+        <div v-if="!activePoster" class="poster-empty"><strong>Афиши появятся здесь автоматически</strong><p>Сотрудники могут добавить JPG, PNG или WebP через редактор или папку на сервере.</p></div>
         <p v-if="posterError" class="poster-warning" role="status">{{posterError}}</p>
       </section>
       <section v-else-if="current==='schedule'||current==='groups'" class="schedule-section" aria-live="polite">
