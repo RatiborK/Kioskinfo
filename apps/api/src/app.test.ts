@@ -8,6 +8,8 @@ import { FolderPosterRepository } from './posters.js';
 import { FileScheduleRepository } from './schedule-file.js';
 import { defaultScheduleFields, type ScheduleRepository } from './schedule.js';
 import { FileThemeRepository } from './themes.js';
+import { FileEventsRepository } from './events.js';
+import { FolderDocumentsRepository } from './documents.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -218,5 +220,51 @@ test('viewer cannot select or publish theme',async()=>{
       payload:{id:'kids',expectedRevision:1}})).statusCode,403);
     assert.equal((await app.inject({method:'POST',url:'/api/editor/theme/publish',headers:{...headers,cookie},
       payload:{expectedRevision:1}})).statusCode,403);
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
+});
+
+test('calendar and documents APIs protect editing and publish only approved event drafts',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-content-routes-'));
+  const store=new MemoryStore();
+  store.accounts=[{id:'admin-docs',username:'admin_docs',display_name:'Админ',role:'admin',
+    password_hash:await hashPassword('very-long-test-secret-2026'),enabled:true}];
+  const events=new FileEventsRepository(join(dir,'events.json'));
+  const documents=new FolderDocumentsRepository(join(dir,'docs'));
+  const app=createApp({store,events,documents,allowedOrigin:'http://127.0.0.1:5173'});
+  const fields={title:'Тестовое мероприятие',date:'2026-11-24',time:'18:00',
+    type:'concert',venue:'hall',description:'Только тест'} as const;
+  try{
+    assert.equal((await app.inject({method:'GET',url:'/api/public/events'})).json().events.length,0);
+    assert.equal((await app.inject({method:'GET',url:'/api/public/documents'})).json().documents.length,0);
+    assert.equal((await app.inject({method:'POST',url:'/api/editor/events',headers,
+      payload:{fields}})).statusCode,401);
+    assert.equal((await app.inject({method:'POST',url:'/api/editor/documents',headers,
+      payload:{title:'Прайс',category:'prices',name:'a.pdf',base64:Buffer.from('%PDF-1.0').toString('base64')}})).statusCode,401);
+    const login=await app.inject(loginBody('admin_docs','very-long-test-secret-2026'));
+    assert.equal(login.statusCode,200);
+    const cookie=String(login.headers['set-cookie']).split(';')[0],authed={...headers,cookie};
+    const created=await app.inject({method:'POST',url:'/api/editor/events',headers:authed,payload:{fields}});
+    assert.equal(created.statusCode,201);const id=created.json().item.id;
+    assert.equal((await app.inject({method:'GET',url:'/api/public/events'})).json().events.length,0);
+    const invalid=await app.inject({method:'PATCH',url:'/api/editor/events/'+id,headers:authed,
+      payload:{expectedRevision:1,fields:{...fields,type:'other',date:'2026-02-31'}}});
+    assert.equal(invalid.statusCode,400);
+    const publish=await app.inject({method:'POST',url:'/api/editor/events/'+id+'/publish',headers:authed,
+      payload:{expectedRevision:1}});
+    assert.equal(publish.statusCode,200);
+    assert.equal((await app.inject({method:'GET',url:'/api/public/events'})).json().events[0].title,fields.title);
+    const payload=Buffer.from('%PDF-1.7\n%integration-test\n').toString('base64');
+    const uploaded=await app.inject({method:'POST',url:'/api/editor/documents',headers:authed,
+      payload:{title:'Тестовый прейскурант',category:'prices',name:'price.pdf',base64:payload}});
+    assert.equal(uploaded.statusCode,201);const docId=uploaded.json().document.id;
+    const indexed=await app.inject({method:'GET',url:'/api/public/documents'});
+    assert.equal(indexed.json().documents.length,1);
+    const file=await app.inject({method:'GET',url:'/api/public/documents/'+docId+'/file'});
+    assert.equal(file.statusCode,200);assert.match(String(file.headers['content-type']),/application\/pdf/);
+    assert.equal((await app.inject({method:'GET',url:'/api/public/documents/'+docId+'/content'})).statusCode,404);
+    const removed=await app.inject({method:'DELETE',url:'/api/editor/documents/'+docId,headers:authed,payload:{}});
+    assert.equal(removed.statusCode,200);
+    assert.equal((await app.inject({method:'GET',url:'/api/public/documents'})).json().documents.length,0);
+    assert.ok(store.events.includes('events.publish'));assert.ok(store.events.includes('documents.upload'));
   }finally{await app.close();await rm(dir,{recursive:true,force:true});}
 });
