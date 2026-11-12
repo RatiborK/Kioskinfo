@@ -20,3 +20,4 @@ backups/
 *.sqlite
 *.sqlite3
 *.db
+*.backup.sql

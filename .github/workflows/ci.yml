@@ -1,9 +1,9 @@
-# .github/workflows/ci.yml — stage-00 build and API tests (lockfile generated at next stage).
+# .github/workflows/ci.yml — both branch and PR validation; no database needed for isolated API tests.
 name: Checks
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, 'stage/**']
 jobs:
   verify:
     runs-on: ubuntu-latest
