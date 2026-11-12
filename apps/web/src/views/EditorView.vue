@@ -1,12 +1,24 @@
 <!-- apps/web/src/views/EditorView.vue — authenticated editor, debounce save and optimistic revisions. -->
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import ScheduleEditor from '../components/ScheduleEditor.vue';
 type Role = 'admin' | 'editor' | 'viewer';
 type Account = {id:string; username:string; displayName:string; role:Role};
 type Page = {id:string;slug:string;title:string;body:string;revision:number;published_revision:number|null};
 type Poster = {name:string;title:string;kind:'image'|'video';url:string;sizeBytes:number;updatedAt:string};
 const scheduleEditor = ref<{flush:()=>Promise<boolean>}|null>(null);
+const route=useRoute(),router=useRouter();
+const tabs=[
+  {id:'schedule',label:'Расписание',number:'01'},
+  {id:'posters',label:'Афиши',number:'02'},
+  {id:'pages',label:'Страницы',number:'03'},
+] as const;
+type EditorTab=(typeof tabs)[number]['id'];
+const activeTab=computed<EditorTab>(()=>{
+  const tab=route.query.tab;
+  return tabs.some(item=>item.id===tab)?tab as EditorTab:'schedule';
+});
 const posters = ref<Poster[]>([]);
 const uploading = ref(false);
 const posterStatus = ref('');
@@ -126,6 +138,24 @@ async function publish(){
     status.value='Опубликовано · версия '+revision.value;
   }catch(e){error.value=String(e instanceof Error?e.message:e);} finally{busy.value=false;}
 }
+/** Save outgoing drafts before navigation; inactive panels stay mounted via v-show. */
+async function changeTab(next:EditorTab):Promise<boolean>{
+  if(next===activeTab.value)return true;
+  if(busy.value||uploading.value)return false;
+  if(activeTab.value==='pages'&&changed){await save();if(changed||busy.value)return false;}
+  if(activeTab.value==='schedule'&&scheduleEditor.value&&!await scheduleEditor.value.flush())return false;
+  await router.replace({path:route.path,query:{...route.query,tab:next}});
+  return true;
+}
+async function handleTabKeydown(event:KeyboardEvent){
+  const key=event.key;
+  if(!['ArrowLeft','ArrowRight','Home','End'].includes(key))return;
+  event.preventDefault();
+  const current=tabs.findIndex(tab=>tab.id===activeTab.value);
+  const next=key==='Home'?0:key==='End'?tabs.length-1:(current+(key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+  const target=tabs[next];
+  if(target&&await changeTab(target.id))document.getElementById('editor-tab-'+target.id)?.focus();
+}
 function warnOnLeave(event:BeforeUnloadEvent){if(changed||busy.value){event.preventDefault();event.returnValue='';}}
 onMounted(()=>{window.addEventListener('beforeunload',warnOnLeave);void refreshSession();});
 onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('beforeunload',warnOnLeave);});
@@ -144,8 +174,19 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
       </form>
       <p v-if="error" class="editor-error" role="alert">{{error}}</p>
     </section>
-    <section v-else class="editor-workspace">
-      <div class="editor-toolbar"><span>{{user.displayName}} · {{user.role}}</span><button class="secondary-button" type="button" @click="logout">Выйти</button></div>
+    <section v-else class="editor-dashboard">
+      <div class="editor-dashboard-bar">
+        <div><span class="eyebrow">РАБОЧАЯ ОБЛАСТЬ</span><p class="editor-dashboard-help">Выберите раздел — здесь появятся только его инструменты.</p></div>
+        <div class="editor-dashboard-user"><span>{{user.displayName}} · {{user.role}}</span><button class="secondary-button" type="button" @click="logout">Выйти</button></div>
+      </div>
+      <nav class="editor-tabs" role="tablist" aria-label="Разделы кабинета сотрудника" @keydown="handleTabKeydown">
+        <button v-for="tab in tabs" :id="'editor-tab-'+tab.id" :key="tab.id" type="button" role="tab"
+          :aria-selected="activeTab===tab.id" :aria-controls="'editor-panel-'+tab.id"
+          :tabindex="activeTab===tab.id?0:-1" @click="changeTab(tab.id)">
+          <span class="editor-tabs-number">{{tab.number}}</span>{{tab.label}}
+        </button>
+      </nav>
+      <div id="editor-panel-posters" v-show="activeTab==='posters'" class="editor-tab-content" role="tabpanel" aria-labelledby="editor-tab-posters">
       <section class="editor-panel poster-editor">
         <div class="poster-editor-top"><div><span class="eyebrow">АВТОМАТИЧЕСКИЙ КАТАЛОГ</span><h2>Афиши и медиаматериалы</h2></div><button type="button" class="secondary-button" @click="loadPosters">Обновить список</button></div>
         <p class="editor-hint">Добавь изображение в браузере или скопируй его в папку <code>content/posters</code> проекта. При добавлении и удалении файлов экран обновится автоматически.</p>
@@ -163,7 +204,11 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
           </div>
         </div>
       </section>
-      <ScheduleEditor ref="scheduleEditor" :role="user.role" />
+      </div>
+      <div id="editor-panel-schedule" v-show="activeTab==='schedule'" class="editor-tab-content" role="tabpanel" aria-labelledby="editor-tab-schedule">
+        <ScheduleEditor ref="scheduleEditor" :role="user.role" />
+      </div>
+      <div id="editor-panel-pages" v-show="activeTab==='pages'" class="editor-tab-content editor-pages-layout" role="tabpanel" aria-labelledby="editor-tab-pages">
       <aside class="editor-page-list"><h2>Страницы</h2><button v-for="page in pages" :key="page.id" class="editor-page-link" :class="{'current':page.id===selectedId}" @click="selectPage(page)">{{page.title}}</button></aside>
       <section class="editor-panel">
         <h2>Содержимое страницы</h2>
@@ -179,6 +224,7 @@ onBeforeUnmount(()=>{if(timer)clearTimeout(timer);window.removeEventListener('be
         </form>
         <p class="status-line">{{status}}</p><p v-if="error" class="editor-error" role="alert">{{error}}</p>
       </section>
+      </div>
     </section>
   </main>
 </template>
