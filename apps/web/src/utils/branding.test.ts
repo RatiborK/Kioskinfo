@@ -22,7 +22,7 @@ test('all eight visitor sections use the single dual-color SVG component',async(
 });
 
 test('visitor themes each supply distinct primary and secondary icon colors',async()=>{
-  const css=await read('../../visitor-themes.css');
+  const css=await read('../visitor-themes.css');
   for(const theme of themes){
     const selector=`:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="${theme}"]{\n  --nav-icon-primary:`;
     const start=css.indexOf(selector);
@@ -50,7 +50,7 @@ test('DK logo appears in both visitor and staff header with no data dependency',
 });
 
 test('menu icon surfaces are frameless and themed, while theme previews show actual icons',async()=>{
-  const css=await read('../../stage056.css');
+  const css=await read('../stage056.css');
   const preview=await read('../components/VisitorThemeEditor.vue');
   const block=css.slice(css.indexOf('/* Stage 05.7: every menu pictogram'),css.indexOf('/* A catalog outage'));
   assert.ok(block.includes('border:0'));
