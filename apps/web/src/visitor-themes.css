@@ -54,6 +54,41 @@
   --v-backdrop:radial-gradient(circle at 90% 18%,#f5b4b65c 0 9%,transparent 9.5%),
     radial-gradient(circle at 20% 90%,#8cd5ca77 0 8%,transparent 8.5%);
 }
+/* Stage 05.7: two-tone icon inks are selected by each published visitor theme.
+   The logo stays in its institutional black/orange/blue colors on a white surface. */
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="dk"]{
+  --nav-icon-primary:#095cba;--nav-icon-secondary:#d85800;
+  --nav-icon-primary-active:#d85800;--nav-icon-secondary-active:#095cba;
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="holiday"]{
+  --nav-icon-primary:#f6d18a;--nav-icon-secondary:#ff9fba;
+  --nav-icon-primary-active:#ff9fba;--nav-icon-secondary-active:#f6d18a;
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="modern"]{
+  --nav-icon-primary:#f4f4ef;--nav-icon-secondary:#77b5e9;
+  --nav-icon-primary-active:#77b5e9;--nav-icon-secondary-active:#f4f4ef;
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="aurora"]{
+  --nav-icon-primary:#87ead6;--nav-icon-secondary:#9acaff;
+  --nav-icon-primary-active:#9acaff;--nav-icon-secondary-active:#87ead6;
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="poster"]{
+  --nav-icon-primary:#2f687a;--nav-icon-secondary:#a04421;
+  --nav-icon-primary-active:#a04421;--nav-icon-secondary-active:#2f687a;
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="gallery"]{
+  --nav-icon-primary:#235e45;--nav-icon-secondary:#9a4b34;
+  --nav-icon-primary-active:#9a4b34;--nav-icon-secondary-active:#235e45;
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="neon"]{
+  --nav-icon-primary:#6df9e6;--nav-icon-secondary:#f7a0ff;
+  --nav-icon-primary-active:#f7a0ff;--nav-icon-secondary-active:#6df9e6;
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="kids"]{
+  --nav-icon-primary:#1c6784;--nav-icon-secondary:#a62e57;
+  --nav-icon-primary-active:#a62e57;--nav-icon-secondary-active:#1c6784;
+}
+
 .screen-shell{background:var(--v-bg);color:var(--v-text);font-family:Inter,"Segoe UI",Arial,sans-serif}
 .screen-shell .screen-content{background-color:var(--v-bg);background-image:var(--v-backdrop);color:var(--v-text)}
 .screen-shell .screen-content::before{border-color:var(--v-line);opacity:.4}
