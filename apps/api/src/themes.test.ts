@@ -50,3 +50,24 @@ test('corrupt file does not get overwritten or clear last published choice',asyn
     await assert.rejects(()=>fresh.publish(2));
   }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('fullscreen preference persists, defaults off and keeps old theme snapshots valid',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-fullscreen-'));
+  const filename=join(dir,'theme.json');
+  try{
+    const repo=new FileThemeRepository(filename);
+    assert.equal((await repo.get()).fullscreenEnabled,false);
+    const enabled=await repo.setFullscreen(true,1);
+    assert.equal(enabled?.fullscreenEnabled,true);
+    assert.equal(enabled?.revision,2);
+    assert.equal(await repo.setFullscreen(false,1),null);
+    assert.equal((await new FileThemeRepository(filename).get()).fullscreenEnabled,true);
+    const published=await repo.publish(2);
+    assert.equal(published?.fullscreenEnabled,true);
+    const legacy={draft:'dk',published:'dk',revision:7,published_revision:6,
+      updatedAt:new Date().toISOString()};
+    await writeFile(filename,JSON.stringify(legacy));
+    assert.equal((await new FileThemeRepository(filename).get()).fullscreenEnabled,false);
+    await assert.rejects(()=>repo.setFullscreen('yes' as unknown as boolean,7));
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
