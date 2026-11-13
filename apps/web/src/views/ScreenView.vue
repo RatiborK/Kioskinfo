@@ -50,6 +50,17 @@ const selectedEventDate=ref(''),pendingSafetyId=ref('');
 const selectedFloorId=ref('floor-1'),selectedMapPoint=ref('');
 type VisitorTheme='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
 const visitorTheme=ref<VisitorTheme>('dk'),knownThemes=new Set(['dk','holiday','modern','aurora','poster','gallery','neon','kids']);
+const fullscreenEnabled=ref(false),fullscreenActive=ref(false);
+let fullscreenGestureFailed=false;
+function syncFullscreen(){fullscreenActive.value=!!document.fullscreenElement;}
+function fullscreenOnGesture(){
+  if(!fullscreenEnabled.value||document.fullscreenElement||fullscreenGestureFailed)return;
+  void document.documentElement.requestFullscreen().catch(()=>{fullscreenGestureFailed=true;});
+}
+async function fullscreenFromButton(){
+  fullscreenGestureFailed=false;
+  try{await document.documentElement.requestFullscreen();}catch{fullscreenGestureFailed=true;}
+}
 let refreshTimer:ReturnType<typeof setInterval>|undefined;
 let slideTimer:ReturnType<typeof setInterval>|undefined;
 let inactivityTimer:ReturnType<typeof setInterval>|undefined;
@@ -167,7 +178,9 @@ async function reloadPosters(){
 }
 async function reloadTheme(){
   try{const r=await fetch('/api/public/theme',{cache:'no-store'});if(!r.ok)return;
-    const data:{theme:string}=await r.json();if(knownThemes.has(data.theme))visitorTheme.value=data.theme as VisitorTheme;
+    const data:{theme:string;fullscreenEnabled?:boolean}=await r.json();
+    if(knownThemes.has(data.theme))visitorTheme.value=data.theme as VisitorTheme;
+    fullscreenEnabled.value=data.fullscreenEnabled===true;
   }catch{/* Keep last known color theme. */}
 }
 function browserKey(event:KeyboardEvent){
@@ -183,6 +196,9 @@ onMounted(async()=>{
     Date.now()-lastManualPoster>12000)movePoster(1,false);},8000);
   inactivityTimer=setInterval(resetIdle,12000);
   window.addEventListener('pointerdown',activity,{passive:true});
+  window.addEventListener('pointerdown',fullscreenOnGesture,{capture:true,passive:true});
+  document.addEventListener('fullscreenchange',syncFullscreen);
+  syncFullscreen();
   window.addEventListener('keydown',activity);
   window.addEventListener('keydown',browserKey,true);
 });
@@ -191,6 +207,8 @@ onBeforeUnmount(()=>{
   if(slideTimer)clearInterval(slideTimer);
   if(inactivityTimer)clearInterval(inactivityTimer);
   window.removeEventListener('pointerdown',activity);
+  window.removeEventListener('pointerdown',fullscreenOnGesture,true);
+  document.removeEventListener('fullscreenchange',syncFullscreen);
   window.removeEventListener('keydown',activity);
   window.removeEventListener('keydown',browserKey,true);
 });
@@ -201,6 +219,9 @@ onBeforeUnmount(()=>{
       <div :key="current" ref="scrollRegion" class="screen-content" :class="{'screen-poster-page':current==='posters'}">
         <header class="brand-row">
           <DkLogo class="kiosk-dk-logo"/>
+          <button v-if="fullscreenEnabled&&!fullscreenActive" type="button"
+            class="kiosk-fullscreen-trigger" @click="fullscreenFromButton"
+            aria-label="Открыть экран посетителя на весь экран">На весь экран</button>
           <button type="button" class="kiosk-search-trigger" aria-label="Поиск по всей НавиКультуре"
             title="Поиск" @click="openSearch">
             <svg viewBox="0 0 24 24" aria-hidden="true" width="27" height="27" fill="none"
@@ -302,12 +323,12 @@ onBeforeUnmount(()=>{
         <span class="nav-label">{{item.label}}</span>
         <span class="nav-glyph"><KioskMenuIcon :name="item.id"/></span>
       </button>
-      <a href="/editor" class="kiosk-admin-shortcut" aria-label="Войти в кабинет администратора">
+      <router-link to="/editor" class="kiosk-admin-shortcut" aria-label="Войти в кабинет администратора">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"
           stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
         </svg><span>Вход в админку</span>
-      </a>
+      </router-link>
       <div class="menu-bottom">ГДК «КИРОВСКИЙ» / НАВИКУЛЬТУРА</div>
     </nav>
     <GlobalSearch v-if="globalSearchOpen" :data="{culture,events,documents,posters}"
