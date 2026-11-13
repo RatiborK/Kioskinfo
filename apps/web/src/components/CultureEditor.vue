@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import {computed,onMounted,ref} from 'vue';
 import NavigationPanel from './NavigationPanel.vue';
-import {isVisibleFloorPlan} from '../utils/active-floor-plans.js';
+import {isVisibleFloorPlan} from '../utils/active-floor-plans.ts';
 import type {CultureContent,CultureCollective,CultureLeader,CultureState,FloorPoint,CultureFloor} from '../utils/culture-types.js';
 type Role='admin'|'editor'|'viewer';
 const props=defineProps<{role:Role}>();
