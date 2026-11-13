@@ -188,6 +188,28 @@ export const defaultCultureState=():CultureState=>({
   revision:1,publishedRevision:1,draft:structuredClone(starterContent),
   published:structuredClone(starterContent),updatedAt:new Date(0).toISOString(),
 });
+/** Restores only missing source-backed DK catalog items. Existing employee records,
+ * metadata, photos, paragraphs, IDs and published content are never overwritten. */
+export function restoreMissingStarterContent(current:CultureContent):{
+ content:CultureContent;
+ added:{categories:number;leaders:number;collectives:number;safety:number}
+}{
+ const next=structuredClone(current);
+ const insert=<T extends {id:string}>(target:T[],source:readonly T[],limit:number)=>{
+   const known=new Set(target.map(x=>x.id));let count=0;
+   for(const item of source){
+     if(!known.has(item.id)&&target.length<limit){
+       target.push(structuredClone(item));known.add(item.id);count++;
+     }
+   }
+   return count;
+ };
+ const categories=insert(next.categories,starterContent.categories,20);
+ const leaders=insert(next.leaders,starterContent.leaders,120);
+ const collectives=insert(next.collectives,starterContent.collectives,250);
+ const safety=insert(next.safety.sections,starterContent.safety.sections,25);
+ return {content:validateCulture(next),added:{categories,leaders,collectives,safety}};
+}
 function normalizeState(value:unknown):CultureState{
   const r=asObject(value),revision=Number(r.revision),pr=Number(r.publishedRevision);
   if(!Number.isSafeInteger(revision)||revision<1||!Number.isSafeInteger(pr)||pr<1||pr>revision)
