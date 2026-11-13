@@ -33,6 +33,7 @@ const initial=route.query.section;
 const current=ref<Section>(items.some(x=>x.id===initial)?initial as Section:'posters');
 const scrollRegion=ref<HTMLElement|null>(null);
 const culture=ref<CultureContent|null>(null);
+const cultureError=ref('');
 const events=ref<PublicEvent[]>([]);
 const documents=ref<PublicDocument[]>([]);
 type Poster={name:string;title:string;kind:'image'|'video';url:string;updatedAt:string};
@@ -132,9 +133,19 @@ function resetIdle(){
   lastActivity=Date.now();
 }
 async function reloadCulture(){
-  try{const r=await fetch('/api/public/culture',{cache:'no-store'});if(!r.ok)return;
-    const data:{content:CultureContent}=await r.json();culture.value=data.content;
-  }catch{/* Keep previous published version. */}
+  try{
+    const r=await fetch('/api/public/culture',{cache:'no-store'});
+    if(!r.ok)throw Error('Сервер вернул '+r.status);
+    const data:{content:CultureContent}=await r.json();
+    if(!data.content||!Array.isArray(data.content.collectives)||!Array.isArray(data.content.leaders))
+      throw Error('Некорректный формат каталога');
+    culture.value=data.content;
+    cultureError.value='';
+  }catch(error){
+    // Never erase the last loaded catalog; show why its latest revision is unavailable.
+    const detail=error instanceof Error?error.message:String(error);
+    cultureError.value='Каталог ДК временно недоступен ('+detail+'). Ранее опубликованные материалы не удалены.';
+  }
 }
 async function reloadEvents(){
   try{const r=await fetch('/api/public/events',{cache:'no-store'});if(!r.ok)return;
@@ -205,6 +216,10 @@ onBeforeUnmount(()=>{
           </button>
           <span class="stage-note">ДК «КИРОВСКИЙ» · КРАСНОЯРСК</span>
         </header>
+        <div v-if="cultureError" class="kiosk-culture-warning" role="status">
+          <span>{{cultureError}}</span>
+          <button type="button" @click="reloadCulture">Повторить загрузку</button>
+        </div>
         <section v-if="current==='posters'" class="poster-gallery kiosk-home-gallery" aria-label="Актуальные афиши">
           <div class="poster-heading kiosk-home-heading"><span class="hero-overline">СКОРО НА СЦЕНЕ</span>
             <h1 data-page-title tabindex="-1">Афиша<span class="dot">.</span></h1></div>
