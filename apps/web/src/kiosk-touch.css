@@ -184,3 +184,52 @@
 .kiosk-video-panel{height:min(92dvh,960px)}
 .kiosk-video-panel .kiosk-video-stage{min-height:240px}
 @media(max-height:700px){.kiosk-video-panel{height:calc(100dvh - 14px)}}
+
+/* Stage 05.9: all visitor content is finger-scrollable; native scrolling is
+   preferred to synthetic wheel events. No horizontal browser bounce. */
+html,body,#app{overscroll-behavior:contain}
+.screen-shell{height:100dvh;min-height:0;overflow:hidden}
+.screen-shell .screen-content{
+  height:100dvh;min-height:0;overflow-y:auto;overflow-x:hidden;
+  overscroll-behavior-y:contain;touch-action:pan-y pinch-zoom;
+  -webkit-overflow-scrolling:touch;scrollbar-gutter:stable
+}
+.screen-shell .schedule-section,.screen-shell .culture-section,
+.screen-shell .culture-directory,.screen-shell .culture-profile{
+  touch-action:pan-y pinch-zoom;overscroll-behavior-y:contain;
+}
+.screen-shell .side-menu{min-height:0;height:100dvh;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y}
+.editor-shell,.editor-panel,.editor-dashboard,.editor-tab-content,
+.editor-page-list,.culture-editor-list,.schedule-manager-list,
+.culture-edit-body,.editor-tabs,.culture-editor-tabs,
+.kiosk-global-search-results,.safety-media-dialog-content{
+  touch-action:pan-x pan-y;overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch
+}
+button,[role=button],a,select,input[type=checkbox],input[type=radio],
+.kiosk-key,.nav-item,.floor-navigation-tabs button{
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent
+}
+.screen-shell button,.screen-shell a,.editor-shell button,.editor-shell a{
+  min-height:44px
+}
+.screen-shell .nav-item{min-height:66px}
+.editor-shell input:not([type=checkbox]):not([type=radio]),
+.editor-shell textarea,.editor-shell select{
+  min-height:48px;font-size:max(16px,1rem)
+}
+.editor-shell button,.editor-shell .editor-link{min-height:46px}
+.kiosk-global-search-backdrop,.kiosk-ticket-scrim,.kiosk-video-scrim{
+  overscroll-behavior:none
+}
+.kiosk-ticket-content,.kiosk-ticket-content iframe,
+.kiosk-video-stage video,.kiosk-video-stage iframe,.document-pdf-frame iframe{
+  touch-action:auto
+}
+@media(max-width:950px){
+  .screen-shell{grid-template-rows:minmax(0,1fr) auto}
+  .screen-shell .screen-content{height:auto;min-height:0;max-height:100dvh}
+  .screen-shell .side-menu{height:auto;max-height:25dvh;touch-action:pan-x pan-y}
+  .screen-shell.kiosk-home .screen-content{overflow:hidden}
+}
