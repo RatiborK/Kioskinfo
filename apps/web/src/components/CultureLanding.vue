@@ -3,6 +3,7 @@
 import {computed,ref} from 'vue';
 import type {CultureContent} from '../utils/culture-types.js';
 const props=defineProps<{content:CultureContent;mode:'about'|'safety'|'tickets'|'contacts'}>();
+const emit=defineEmits<{(e:'open-video',url:string,title:string):void;(e:'buy-ticket',url:string):void}>();
 const openSection=ref<string|null>(null);
 const videoReady=computed(()=>Boolean(props.content.about.videoUrl));
 const safeTicketUrl=computed(()=>props.content.tickets.url);
@@ -26,7 +27,7 @@ function safetyScroll(id:string){
         <span class="eyebrow">ПАМЯТКИ ДЛЯ ПОСЕТИТЕЛЕЙ · ДК «КИРОВСКИЙ»</span>
         <h2>{{content.safety.title}}</h2>
         <p>{{content.safety.intro}}</p>
-        <div class="safety-hero-mark"><span>06</span> полезных памяток для каждого посетителя</div>
+        <div class="safety-hero-mark"><span>{{content.safety.sections.length}}</span> памяток по безопасности и профилактике</div>
       </div>
       <div class="safety-hero-art" role="img" aria-label="Иллюстрация: защищённое пространство и забота о посетителях">
         <svg viewBox="0 0 340 310" fill="none" aria-hidden="true">
@@ -81,9 +82,10 @@ function safetyScroll(id:string){
         <span class="eyebrow">НАША ИСТОРИЯ · С 1967 ГОДА</span>
         <h2>{{content.about.title}}</h2>
         <p>{{content.about.intro}}</p>
-        <a v-if="videoReady" class="culture-video-link" :href="content.about.videoUrl" target="_blank" rel="noopener noreferrer">
+        <button v-if="videoReady" type="button" class="culture-video-link"
+          @click="emit('open-video',content.about.videoUrl,'Видеопрогулка по ДК «Кировский»')">
           <span>▶</span> Видеопрогулка по Дворцу культуры
-        </a>
+        </button>
       </div>
     </div>
     <div class="about-facts">
@@ -98,9 +100,10 @@ function safetyScroll(id:string){
       <span class="eyebrow">ПОЗНАКОМЬТЕСЬ С ДК БЛИЖЕ</span>
       <h3>Загляните за кулисы</h3>
       <p>Посмотрите видеопрогулку по зданию, сцене и творческому пространству Дворца культуры.</p>
-      <a v-if="videoReady" :href="content.about.videoUrl" target="_blank" rel="noopener noreferrer">▶ Смотреть видео</a>
+      <button v-if="videoReady" type="button"
+        @click="emit('open-video',content.about.videoUrl,'Видеопрогулка по ДК «Кировский»')">▶ Смотреть видео</button>
     </section>
-    <p v-if="content.about.sourceUrl" class="culture-source">Историческая справка: <a :href="content.about.sourceUrl" target="_blank" rel="noopener noreferrer">Культура.РФ</a>. Часть сведений требует актуализации учреждением.</p>
+    <p v-if="content.about.sourceUrl" class="culture-source">Историческая справка: Культура.РФ. Часть сведений требует актуализации учреждением.</p>
   </article>
   <article v-else-if="mode==='tickets'" class="culture-landing tickets-landing" aria-label="Билеты на мероприятия">
     <div class="tickets-stage">
@@ -108,9 +111,9 @@ function safetyScroll(id:string){
       <div class="tickets-stage-art" aria-hidden="true"><span>✦</span><i></i><span>✦</span></div>
       <h2>{{content.tickets.title}}</h2>
       <p>{{content.tickets.intro}}</p>
-      <a class="tickets-external-link" :href="safeTicketUrl" target="_blank" rel="noopener noreferrer">
+      <button class="tickets-external-link" type="button" @click="emit('buy-ticket',safeTicketUrl)">
         Посмотреть афишу и купить билет <span>↗</span>
-      </a>
+      </button>
       <p class="tickets-stage-note">{{content.tickets.note}}</p>
     </div>
     <div class="tickets-benefits">
@@ -126,11 +129,11 @@ function safetyScroll(id:string){
     </div>
     <div class="culture-contact-grid">
       <div><small>АДРЕС</small><strong>{{content.contact.address}}</strong></div>
-      <div><small>ТЕЛЕФОН</small><a :href="'tel:'+content.contact.phone.replace(/[^+\d]/g,'')">{{content.contact.phone}}</a></div>
+      <div><small>ТЕЛЕФОН</small><strong>{{content.contact.phone}}</strong></div>
       <div><small>О КРУЖКАХ И КОЛЛЕКТИВАХ</small><strong>{{content.contact.clubsPhone}}</strong></div>
       <div><small>СПРАВКИ О МЕРОПРИЯТИЯХ</small><strong>{{content.contact.eventsPhone}}</strong></div>
       <div><small>РЕЖИМ РАБОТЫ</small><strong>{{content.contact.hours}}</strong></div>
-      <div><small>САЙТ</small><a :href="content.contact.website" target="_blank" rel="noopener noreferrer">Официальный сайт ↗</a></div>
+      <div><small>САЙТ</small><strong>{{content.contact.website.replace(/^https?:\/\//,'')}}</strong></div>
     </div>
   </article>
 </template>
