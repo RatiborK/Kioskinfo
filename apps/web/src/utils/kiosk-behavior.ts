@@ -10,3 +10,9 @@ export function visiblePosterWindow<T>(items:readonly T[],index:number,limit=6):
 export function shouldReturnHome(lastActivity:number,now:number,timeoutMs=180000):boolean{
   return Number.isFinite(lastActivity)&&Number.isFinite(now)&&now>=lastActivity&&now-lastActivity>=timeoutMs;
 }
+
+/** Horizontal touch/pointer swipe; ignore small movements and vertical scrolling. */
+export function posterSwipe(dx:number,dy:number,threshold=55):1|-1|null{
+  if(!Number.isFinite(dx)||!Number.isFinite(dy)||Math.abs(dx)<threshold||Math.abs(dx)<=Math.abs(dy)*1.25)return null;
+  return dx<0?1:-1;
+}
