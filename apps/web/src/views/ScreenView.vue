@@ -180,7 +180,12 @@ async function reloadTheme(){
   try{const r=await fetch('/api/public/theme',{cache:'no-store'});if(!r.ok)return;
     const data:{theme:string;fullscreenEnabled?:boolean}=await r.json();
     if(knownThemes.has(data.theme))visitorTheme.value=data.theme as VisitorTheme;
+    const previouslyEnabled=fullscreenEnabled.value;
     fullscreenEnabled.value=data.fullscreenEnabled===true;
+    // Managed Edge can allow an automatic Fullscreen API request for this origin.
+    // Ordinary browsers will reject it; the explicit button/first user gesture remains.
+    if(fullscreenEnabled.value&&!previouslyEnabled&&!document.fullscreenElement)
+      void document.documentElement.requestFullscreen().catch(()=>{});
   }catch{/* Keep last known color theme. */}
 }
 function browserKey(event:KeyboardEvent){
