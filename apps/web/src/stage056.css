@@ -172,3 +172,17 @@
  .kiosk-ticket-keyboard-help{left:10px;right:10px;bottom:10px}
 }
 @media(prefers-reduced-motion:reduce){.floor-navigation-map,.floor-navigation-pin{transition:none}}
+
+/* Staff login on-screen keyboard: separate from visitor design tokens. */
+.login-keyboard-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.login-touch-keyboard{margin:10px 0;padding:15px;border:1px solid #4c5055;background:#151515;border-radius:10px}
+.login-touch-keyboard>p{font-size:13px;color:#c7c7c7;margin:0 0 10px}
+.login-touch-keyboard .kiosk-keyboard{display:flex;flex-direction:column;gap:8px}
+.login-touch-keyboard .kiosk-keyboard-row{display:flex;justify-content:center;flex-wrap:wrap;gap:5px}
+.login-touch-keyboard .kiosk-key{min-width:39px;min-height:44px;flex:0 0 39px;
+  color:#f7f7f7;background:#292929;border:1px solid #6a6a6a;border-radius:7px;font-size:19px;font-weight:800}
+.login-touch-keyboard .kiosk-key-action{flex:0 1 auto;min-width:58px;font-size:13px;padding:8px}
+.login-touch-keyboard .kiosk-key-space{flex:1 1 90px;min-width:90px;max-width:160px;font-size:14px}
+.login-touch-keyboard .kiosk-key:hover,.login-touch-keyboard .kiosk-key:focus-visible{
+  background:#ff6a00;color:#111;border-color:#ff6a00}
+@media(max-width:720px){.login-touch-keyboard .kiosk-key{min-width:31px;flex-basis:31px;font-size:15px}}
