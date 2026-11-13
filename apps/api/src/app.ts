@@ -6,11 +6,11 @@ import { posterFileStream, type PosterRepository } from './posters.js';
 import { validateScheduleFields, type ScheduleRepository } from './schedule.js';
 import {validateEvent,type EventsRepository} from './events.js';
 import {documentStream,type DocumentRepository} from './documents.js';
-import { defaultThemeSettings,isThemeId,THEME_NAMES, VISITOR_THEME_IDS,type ThemeRepository } from './themes.js';
-import {CultureMedia,defaultCultureState,validateCulture,restoreMissingStarterContent,type CultureRepository} from './culture.js';
+import { defaultThemeSettings,isThemeId,isHexColor,THEME_NAMES, VISITOR_THEME_IDS,type ThemeRepository } from './themes.js';
+import {CultureMedia,CultureVideos,MAX_CULTURE_VIDEO_BYTES,defaultCultureState,validateCulture,restoreMissingStarterContent,type CultureRepository} from './culture.js';
 import {cultureWithOptionalSchedule} from './culture-availability.js';
 
-export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; events?: EventsRepository; documents?: DocumentRepository; culture?: CultureRepository; cultureMedia?: CultureMedia; cookieSecure?: boolean; allowedOrigin?: string }
+export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; events?: EventsRepository; documents?: DocumentRepository; culture?: CultureRepository; cultureMedia?: CultureMedia; videos?: CultureVideos; cookieSecure?: boolean; allowedOrigin?: string }
 const MAX_AGE_S = 8 * 60 * 60;
 const ID = /^[a-z0-9_-]{1,80}$/i;
 const cookieName = (secure: boolean) => secure ? '__Host-navikultura_sid' : 'navikultura_dev_sid';
@@ -26,14 +26,18 @@ function userPublic(account: Account) {
 }
 export function createApp(options: AppOptions) {
   const app = Fastify({ logger: false, bodyLimit: 11_000_000 });
-  const { store, posters, schedule, themes, events, documents, culture, cultureMedia, cookieSecure = false, allowedOrigin } = options;
+  const { store, posters, schedule, themes, events, documents, culture, cultureMedia, videos, cookieSecure = false, allowedOrigin } = options;
   const failedLogins = new Map<string, { count: number; windowStart: number }>();
   const mutating = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
+  // Binary video uploads are parsed only at the dedicated authenticated route.
+  app.addContentTypeParser('application/octet-stream',{parseAs:'buffer'},(_request,body,done)=>done(null,body));
   app.addHook('onRequest', async (request, reply) => {
     if (!mutating.has(request.method)) return;
     // JSON + a custom header and SameSite=Strict protect against ordinary cross-site form submissions.
     if (request.headers['x-navikultura-action'] !== '1') return reply.code(403).send({ error: 'Необходим заголовок X-Navikultura-Action' });
-    if (!request.headers['content-type']?.startsWith('application/json')) return reply.code(415).send({ error: 'Ожидается JSON' });
+    const isVideoUpload=request.url==='/api/editor/culture/video'&&request.method==='POST';
+    if (!request.headers['content-type']?.startsWith(isVideoUpload?'application/octet-stream':'application/json'))
+      return reply.code(415).send({error:'Неверный формат запроса'});
     const origin = request.headers.origin;
     if (origin && allowedOrigin && origin !== allowedOrigin) return reply.code(403).send({ error: 'Источник запроса не разрешён' });
     if (origin && !allowedOrigin) return reply.code(403).send({ error: 'Разрешённый адрес редактора не настроен' });
@@ -136,6 +140,56 @@ export function createApp(options: AppOptions) {
     reply.header('X-Content-Type-Options','nosniff');
     return reply.send(result.stream);
   });
+  app.post<{Body:Buffer}>('/api/editor/culture/video',
+    {bodyLimit:MAX_CULTURE_VIDEO_BYTES+1024},async(request,reply)=>{
+      const user=await requireRole(request,reply,['admin','editor']);if(!user)return;
+      if(!videos)return reply.code(503).send({error:'Локальное видео на сервере не настроено'});
+      let filename='';
+      try{filename=decodeURIComponent(String(request.headers['x-navikultura-file-name']??''));}
+      catch{return reply.code(400).send({error:'Неверное имя файла'});}
+      try{
+        const url=await videos.upload(filename,request.body);
+        await store.audit(user.id,'culture.video',{uploaded:true});
+        return reply.code(201).send({url});
+      }catch(error){return reply.code(400).send({error:error instanceof Error?error.message:'Недопустимое видео'});}
+    });
+  app.get<{Params:{name:string}}>('/api/public/culture/video/:name',async(request,reply)=>{
+    const info=await videos?.info(request.params.name);
+    if(!info)return reply.code(404).send({error:'Видео не найдено'});
+    reply.header('Content-Type',info.mime);
+    reply.header('X-Content-Type-Options','nosniff');
+    reply.header('Cache-Control','public,max-age=3600');
+    reply.header('Accept-Ranges','bytes');
+    const header=request.headers.range;
+    let start=0,end=info.size-1;
+    if(header){
+      const parts=/^bytes=(\d*)-(\d*)$/.exec(header);
+      if(!parts||(!parts[1]&&!parts[2])) {
+        reply.header('Content-Range','bytes */'+info.size);
+        return reply.code(416).send();
+      }
+      if(!parts[1]) {
+        const suffix=Number(parts[2]);
+        if(!Number.isSafeInteger(suffix)||suffix<1){
+          reply.header('Content-Range','bytes */'+info.size);
+          return reply.code(416).send();
+        }
+        start=Math.max(0,info.size-suffix);
+      }else{
+        start=Number(parts[1]);
+        end=parts[2]?Number(parts[2]):end;
+      }
+      if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||start>=info.size||end<start){
+        reply.header('Content-Range','bytes */'+info.size);
+        return reply.code(416).send();
+      }
+      end=Math.min(end,info.size-1);
+      reply.header('Content-Range',`bytes ${start}-${end}/${info.size}`);
+      reply.code(206);
+    }
+    reply.header('Content-Length',String(end-start+1));
+    return reply.send(videos!.stream(info.path,start,end));
+  });
   // Calendar data is independently reviewed: no draft details are exposed to visitors.
   app.get('/api/public/events',async(_request,reply)=>{
     reply.header('Cache-Control','no-store');return {events:events?await events.list():[]};
@@ -221,7 +275,8 @@ export function createApp(options: AppOptions) {
   app.get('/api/public/theme',async (_request,reply)=>{
     reply.header('Cache-Control','no-store');
     const selected=themes?await themes.get():defaultThemeSettings();
-    return {theme:selected.published,revision:selected.published_revision,fullscreenEnabled:selected.fullscreenEnabled};
+    return {theme:selected.published,revision:selected.published_revision,fullscreenEnabled:selected.fullscreenEnabled,
+      dkBackground:selected.dkBackground,dkGlow:selected.dkGlow};
   });
   app.get('/api/editor/theme',async (request,reply)=>{
     const account=await requireRole(request,reply,['admin','editor','viewer']);
@@ -265,6 +320,18 @@ export function createApp(options: AppOptions) {
     await store.audit(account.id,'theme.fullscreen',{enabled,revision:result.revision});
     reply.header('Cache-Control','no-store');return {settings:result};
   });
+  app.post<{Body:{background?:unknown;glow?:unknown;expectedRevision?:unknown}}>(
+    '/api/editor/theme/dk-colors',async(request,reply)=>{
+      const account=await requireRole(request,reply,['admin']);if(!account)return;
+      if(!themes)return reply.code(503).send({error:'Хранилище тем не настроено'});
+      const {background,glow,expectedRevision}=request.body??{};
+      if(!isHexColor(background)||!isHexColor(glow)||!Number.isSafeInteger(expectedRevision)||
+        Number(expectedRevision)<1)return reply.code(400).send({error:'Нужны два цвета HEX и корректная версия'});
+      const result=await themes.setDkColors(background,glow,Number(expectedRevision));
+      if(!result)return reply.code(409).send({error:'Настройки изменены другим сотрудником. Обновите страницу'});
+      await store.audit(account.id,'theme.dk-colors',{revision:result.revision});
+      reply.header('Cache-Control','no-store');return {settings:result};
+    });
   // Browser schedule editor: drafts are private, only published snapshots reach the kiosk.
   app.get('/api/editor/schedule', async (request, reply) => {
     const account = await requireRole(request, reply, ['admin','editor','viewer']);

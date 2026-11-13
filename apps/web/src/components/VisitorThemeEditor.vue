@@ -3,8 +3,9 @@
 import { computed,onMounted,ref } from 'vue';
 import DkLogo from './DkLogo.vue';
 import KioskMenuIcon from './KioskMenuIcon.vue';
+import {DK_BACKGROUND,DK_GLOW,dkThemeVars,normalizeHex} from '../utils/dk-colors.js';
 type ThemeId='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
-type ThemeSettings={draft:ThemeId;published:ThemeId;revision:number;published_revision:number;updatedAt:string;fullscreenEnabled:boolean};
+type ThemeSettings={draft:ThemeId;published:ThemeId;revision:number;published_revision:number;updatedAt:string;fullscreenEnabled:boolean;dkBackground:string;dkGlow:string};
 type ThemeInfo={id:ThemeId;name:string;description:string};
 const themes:ThemeInfo[]=[
   {id:'dk',name:'Стиль сайта ДК',description:'Тёмный сине-серый фон, мягкое бирюзовое свечение, оранжевые и синие акценты'},
@@ -21,6 +22,10 @@ const props=defineProps<{role:Role}>();
 const settings=ref<ThemeSettings|null>(null);
 const choice=ref<ThemeId>('dk');
 const busy=ref(false),error=ref(''),status=ref('Загрузка тем…');
+const dkBackground=ref(DK_BACKGROUND),dkGlow=ref(DK_GLOW);
+const dkPreviewStyle=computed(()=>dkThemeVars(dkBackground.value,dkGlow.value));
+const dkColorDirty=computed(()=>!!settings.value&&(
+  dkBackground.value!==settings.value.dkBackground||dkGlow.value!==settings.value.dkGlow));
 const dirty=computed(()=>!!settings.value&&choice.value!==settings.value.draft);
 const publishedName=computed(()=>themes.find(t=>t.id===settings.value?.published)?.name??'Стиль сайта ДК');
 const selectedName=computed(()=>themes.find(t=>t.id===choice.value)?.name??'Стиль сайта ДК');
@@ -37,6 +42,8 @@ async function load(){
   try{
     const data=await request<{settings:ThemeSettings}>('/api/editor/theme');
     settings.value=data.settings;choice.value=data.settings.draft;
+    dkBackground.value=normalizeHex(data.settings.dkBackground,DK_BACKGROUND);
+    dkGlow.value=normalizeHex(data.settings.dkGlow,DK_GLOW);
     status.value='Текущая тема посетителей: '+publishedName.value;
   }catch(e){error.value=message(e);status.value='Не удалось прочитать темы';}
   finally{busy.value=false;}
@@ -62,6 +69,22 @@ async function publish(){
     });
     settings.value=data.settings;status.value='Тема опубликована. Экран посетителя обновится автоматически.';
   }catch(e){error.value=message(e);}finally{busy.value=false;}
+}
+async function saveDkColors(){
+  if(!settings.value||props.role!=='admin'||busy.value||!dkColorDirty.value)return;
+  busy.value=true;error.value='';
+  try{
+    const data=await request<{settings:ThemeSettings}>('/api/editor/theme/dk-colors',{
+      method:'POST',headers,
+      body:JSON.stringify({background:dkBackground.value,glow:dkGlow.value,
+        expectedRevision:settings.value.revision}),
+    });
+    settings.value=data.settings;
+    status.value='Цвета ДК применены. Посетительский экран подхватит изменения без перезапуска.';
+  }catch(e){error.value=message(e);}finally{busy.value=false;}
+}
+function resetDkColors(){
+  dkBackground.value=DK_BACKGROUND;dkGlow.value=DK_GLOW;
 }
 async function saveFullscreen(enabled:boolean){
   if(!settings.value||props.role!=='admin'||busy.value)return;
@@ -94,7 +117,7 @@ onMounted(()=>{void load();});
       <button v-for="item in themes" :key="item.id" type="button" class="visitor-theme-card"
         :class="{selected:choice===item.id}" :aria-pressed="choice===item.id"
         :disabled="busy||role==='viewer'" @click="choice=item.id;status='Предпросмотр темы — ещё не опубликована';error=''">
-        <div class="visitor-theme-preview" :data-visitor-theme="item.id" aria-hidden="true">
+        <div class="visitor-theme-preview" :data-visitor-theme="item.id" :style="item.id==='dk'?dkPreviewStyle:undefined" aria-hidden="true">
           <div class="theme-mini-header"><DkLogo class="theme-mini-dk-logo"/><span>ДК</span></div>
           <div class="theme-mini-title">Афиша.</div>
           <div class="theme-mini-controls theme-mini-icons"><span><KioskMenuIcon name="posters"/> Афиша</span><span><KioskMenuIcon name="groups"/> Коллективы</span></div>
@@ -107,13 +130,38 @@ onMounted(()=>{void load();});
     </div>
     <div class="visitor-theme-large">
       <span class="eyebrow">ПРЕДПРОСМОТР · {{selectedName.toUpperCase()}}</span>
-      <div class="visitor-theme-preview" :data-visitor-theme="choice" aria-label="Предпросмотр выбранной темы">
+      <div class="visitor-theme-preview" :data-visitor-theme="choice" :style="choice==='dk'?dkPreviewStyle:undefined" aria-label="Предпросмотр выбранной темы">
         <div class="theme-mini-header"><DkLogo class="theme-mini-dk-logo"/><span>СЕГОДНЯ</span></div>
         <div class="theme-mini-title">Афиша и события.</div>
         <div class="theme-mini-controls theme-mini-icons"><span><KioskMenuIcon name="posters"/> Афиша</span><span><KioskMenuIcon name="calendar"/> Календарь</span><span><KioskMenuIcon name="groups"/> Коллективы</span></div>
         <div class="theme-mini-bottom"><span>Найдите нужное событие</span><span>ГДК «КИРОВСКИЙ»</span></div>
       </div>
     </div>
+    <section v-if="choice==='dk'" class="visitor-dk-color-settings" aria-label="Палитра темы ДК">
+      <div class="visitor-dk-color-heading"><h3>Цвета фона ДК</h3>
+        <p class="editor-hint">Выберите оттенки на цветовом круге. Акценты логотипа и значков остаются прежними.</p></div>
+      <div class="visitor-dk-color-grid">
+        <label class="visitor-dk-color-field">
+          <span>Основной фон</span>
+          <input type="color" v-model="dkBackground" :disabled="busy||role!=='admin'"
+            aria-label="Выбрать цвет фона ДК"/>
+          <code>{{dkBackground}}</code>
+        </label>
+        <label class="visitor-dk-color-field">
+          <span>Движущееся световое пятно</span>
+          <input type="color" v-model="dkGlow" :disabled="busy||role!=='admin'"
+            aria-label="Выбрать цвет светового пятна ДК"/>
+          <code>{{dkGlow}}</code>
+        </label>
+      </div>
+      <div class="visitor-dk-color-actions">
+        <button v-if="role==='admin'" type="button" class="primary-button"
+          :disabled="busy||!dkColorDirty" @click="saveDkColors">Применить цвета</button>
+        <button v-if="role==='admin'" type="button" class="secondary-button"
+          :disabled="busy" @click="resetDkColors">Исходные оттенки</button>
+        <span class="editor-hint">Предпросмотр меняется сразу. Нажмите «Применить цвета» для сохранения.</span>
+      </div>
+    </section>
     <section v-if="role==='admin'" class="visitor-kiosk-settings">
       <h3>Режим терминала</h3>
       <label class="visitor-kiosk-fullscreen">

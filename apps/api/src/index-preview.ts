@@ -9,7 +9,7 @@ import {seedPreviewSchedule} from './seed-preview-schedule.js';
 import { FileThemeRepository } from './themes.js';
 import { FileEventsRepository } from './events.js';
 import { FolderDocumentsRepository } from './documents.js';
-import {FileCultureRepository,CultureMedia} from './culture.js';
+import {FileCultureRepository,CultureMedia,CultureVideos} from './culture.js';
 import { hashLocalPreviewPassword } from './crypto.js';
 import type { Account, Page, PublicContent, Session, Store } from './model.js';
 
@@ -52,7 +52,7 @@ catch(error){
   process.stderr.write('[NAVIKULTURA] Старое расписание недоступно; культурный каталог продолжит работу: '+
     (error instanceof Error?error.message:String(error))+'\n');
 }
-const app=createApp({store,posters:new FolderPosterRepository(),schedule:scheduleRepo,themes:new FileThemeRepository(),events:new FileEventsRepository(),documents:new FolderDocumentsRepository(),culture:new FileCultureRepository(),cultureMedia:new CultureMedia(),allowedOrigin:'http://127.0.0.1:5173'});
+const app=createApp({store,posters:new FolderPosterRepository(),schedule:scheduleRepo,themes:new FileThemeRepository(),events:new FileEventsRepository(),documents:new FolderDocumentsRepository(),culture:new FileCultureRepository(),cultureMedia:new CultureMedia(),videos:new CultureVideos(),allowedOrigin:'http://127.0.0.1:5173'});
 try {
   await app.listen({host:'127.0.0.1',port:3100});
   process.stdout.write('\n[LOCAL DEV ONLY] НавиКультура: http://127.0.0.1:5173/editor\n');

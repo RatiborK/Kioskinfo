@@ -33,9 +33,12 @@ export interface CultureRepository{
 }
 const MAX_BYTES=900000;
 const MAX_PHOTO_BYTES=3*1024*1024;
+export const MAX_CULTURE_VIDEO_BYTES=48*1024*1024;
+const videoName=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(mp4|webm)$/;
 const imageName=/^[0-9a-f-]{36}\.(png|jpg|webp)$/;
 export const cultureFile=()=>fileURLToPath(new URL('../../../content/culture/catalog.json',import.meta.url));
 export const cultureImagesDir=()=>fileURLToPath(new URL('../../../content/culture/images',import.meta.url));
+export const cultureVideosDir=()=>fileURLToPath(new URL('../../../content/culture/videos',import.meta.url));
 const asObject=(v:unknown):Record<string,unknown>=>{
   if(!v||typeof v!=='object'||Array.isArray(v))throw Error('Ожидался объект каталога');
   return v as Record<string,unknown>;
@@ -70,8 +73,11 @@ const photoUrl=(v:unknown):string=>{
   return parsed;
 };
 const videoUrl=(v:unknown):string=>{
-  const value=httpsUrl(v);
-  if(!value)return '';
+  const raw=string(v,600);
+  if(!raw)return '';
+  if(/^\/api\/public\/culture\/video\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(mp4|webm)$/.test(raw))
+    return raw;
+  const value=httpsUrl(raw);
   const host=new URL(value).hostname.toLowerCase();
   if(!['vk.com','vkvideo.ru','rutube.ru','www.rutube.ru','youtube.com','www.youtube.com','youtu.be'].includes(host))
     throw Error('Видео должно ссылаться на VK, Rutube или YouTube');
@@ -325,4 +331,36 @@ export class CultureMedia {
         mime:ext==='png'?'image/png':ext==='webp'?'image/webp':'image/jpeg',size};
     }catch{return null;}
   }
+}
+
+// Local videos are stored outside public/ to avoid accidental filesystem exposure.
+// Upload requires an authenticated staff member; only opaque UUID paths are served.
+export class CultureVideos {
+  constructor(private readonly dir:string=cultureVideosDir()){}
+  async upload(filename:string,bytes:Buffer):Promise<string>{
+    if(typeof filename!=='string'||filename.length>180||!Buffer.isBuffer(bytes)||
+       bytes.length<16||bytes.length>MAX_CULTURE_VIDEO_BYTES)
+      throw Error('Видео должно быть MP4/WebM размером до 48 МБ');
+    const suffix=filename.toLowerCase().endsWith('.mp4')?'mp4':
+      filename.toLowerCase().endsWith('.webm')?'webm':'';
+    if(!suffix)throw Error('Допускаются только файлы MP4 и WebM');
+    const mp4=bytes.toString('ascii',4,8)==='ftyp';
+    const webm=bytes.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3]));
+    if((suffix==='mp4'&&!mp4)||(suffix==='webm'&&!webm))
+      throw Error('Расширение не соответствует видеоформату');
+    const name=randomUUID()+'.'+suffix;
+    await mkdir(this.dir,{recursive:true});
+    await writeFile(join(this.dir,name),bytes,{flag:'wx',mode:0o600});
+    return '/api/public/culture/video/'+name;
+  }
+  async info(name:string):Promise<{path:string;size:number;mime:string}|null>{
+    if(!videoName.test(name))return null;
+    const file=join(this.dir,name);
+    try{
+      const size=(await stat(file)).size;
+      if(size<16||size>MAX_CULTURE_VIDEO_BYTES)return null;
+      return {path:file,size,mime:name.endsWith('.mp4')?'video/mp4':'video/webm'};
+    }catch{return null;}
+  }
+  stream(path:string,start:number,end:number){return createReadStream(path,{start,end});}
 }

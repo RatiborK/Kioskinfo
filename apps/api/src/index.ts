@@ -6,14 +6,14 @@ import { PgScheduleRepository } from './schedule-pg.js';
 import { PgThemeRepository } from './themes.js';
 import { PgEventsRepository } from './events.js';
 import { FolderDocumentsRepository } from './documents.js';
-import {PgCultureRepository,CultureMedia} from './culture.js';
+import {PgCultureRepository,CultureMedia,CultureVideos} from './culture.js';
 const host = process.env.HOST ?? '127.0.0.1';
 const port = Number(process.env.PORT ?? '3100');
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT должен быть от 1 до 65535');
 // Never run an unauthenticated API on a public interface. Reverse proxy handles LAN HTTPS.
 if (host !== '127.0.0.1' && host !== '::1') throw new Error('API должен слушать loopback — настройте HTTPS reverse proxy для LAN');
 const pool = makePool();
-const app = createApp({ store: new PgStore(pool), posters: new FolderPosterRepository(), schedule: new PgScheduleRepository(pool), themes: new PgThemeRepository(pool), events: new PgEventsRepository(pool), documents: new FolderDocumentsRepository(), culture: new PgCultureRepository(pool), cultureMedia: new CultureMedia(), cookieSecure: process.env.COOKIE_SECURE === 'true', allowedOrigin: process.env.EDITOR_ORIGIN });
+const app = createApp({ store: new PgStore(pool), posters: new FolderPosterRepository(), schedule: new PgScheduleRepository(pool), themes: new PgThemeRepository(pool), events: new PgEventsRepository(pool), documents: new FolderDocumentsRepository(), culture: new PgCultureRepository(pool), cultureMedia: new CultureMedia(), videos: new CultureVideos(), cookieSecure: process.env.COOKIE_SECURE === 'true', allowedOrigin: process.env.EDITOR_ORIGIN });
 try {
   await pool.query('SELECT 1');
   await app.listen({ host, port });

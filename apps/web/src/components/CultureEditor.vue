@@ -163,6 +163,26 @@ async function uploadPhoto(event:Event,target:'club'|'leader'|'about'){
     touch();message.value='Фото загружено. Нажмите «Сохранить» и «Опубликовать».';
   }catch(e){error.value=messageOf(e);}finally{busy.value=false;input.value='';}
 }
+async function uploadVideo(event:Event,target:'club'|'about'){
+  const input=event.target as HTMLInputElement,file=input.files?.[0];
+  if(!file||!draft.value||busy.value||!canEdit.value)return;
+  if(file.size>48*1024*1024){error.value='Видео больше 48 МБ';input.value='';return;}
+  busy.value=true;error.value='';message.value='Загружаем видео в локальную библиотеку ДК…';
+  try{
+    const response=await fetch('/api/editor/culture/video',{
+      method:'POST',credentials:'same-origin',cache:'no-store',
+      headers:{'Content-Type':'application/octet-stream','X-Navikultura-Action':'1',
+        'X-Navikultura-File-Name':encodeURIComponent(file.name)},
+      body:file,
+    });
+    const result:{url?:string;error?:string}=await response.json();
+    if(!response.ok||!result.url)throw Error(result.error??'Не удалось загрузить видео');
+    if(target==='club'&&group.value)group.value.videoUrl=result.url;
+    if(target==='about')draft.value.about.videoUrl=result.url;
+    touch();message.value='Видео загружено. Сохраните черновик и опубликуйте.';
+  }catch(e){error.value=messageOf(e);}
+  finally{busy.value=false;input.value='';}
+}
 async function flush():Promise<boolean>{return dirty.value?save():!busy.value;}
 defineExpose({flush});
 onMounted(()=>{void load();});
@@ -211,7 +231,12 @@ onMounted(()=>{void load();});
           <label>Расписание<input v-model="group.schedule" maxlength="400" :disabled="!canEdit" @input="touch"/></label>
           <label>Кабинет / зал<input v-model="group.room" maxlength="150" :disabled="!canEdit" @input="touch"/></label>
           <label>Возраст<input v-model="group.age" maxlength="120" :disabled="!canEdit" @input="touch"/></label>
-          <label>Ссылка на видео (VK / Rutube / YouTube)<input v-model="group.videoUrl" maxlength="600" :disabled="!canEdit" @input="touch"/></label>
+          <label>Ссылка на видео (VK Видео / RUTUBE / YouTube) или локальный ролик
+             <input v-model="group.videoUrl" maxlength="600" :disabled="!canEdit" @input="touch"/>
+           </label>
+           <label v-if="canEdit" class="culture-edit-video-upload">Загрузить локальное видео MP4/WebM (до 48 МБ)
+             <input type="file" accept=".mp4,.webm,video/mp4,video/webm" :disabled="busy" @change="uploadVideo($event,'club')"/>
+           </label>
           <label>Группы и направления, по одному на строку<textarea :value="programsToLines(group)" rows="5"
             :disabled="!canEdit" @input="updatePrograms(($event.target as HTMLTextAreaElement).value)"/></label>
           <fieldset class="culture-edit-leaders"><legend>Руководители</legend>
@@ -253,7 +278,11 @@ onMounted(()=>{void load();});
           <label v-if="canEdit">Изменить фото здания<input type="file" accept=".jpg,.jpeg,.png,.webp"
             :disabled="busy" @change="uploadPhoto($event,'about')"/></label>
         </div>
-        <label>Ссылка на видео<input v-model="draft.about.videoUrl" :disabled="!canEdit" @input="touch"/></label>
+        <label>Ссылка на видеопрогулку (VK Видео / RUTUBE / YouTube или локальное видео)
+           <input v-model="draft.about.videoUrl" maxlength="600" :disabled="!canEdit" @input="touch"/></label>
+         <label v-if="canEdit" class="culture-edit-video-upload">Загрузить локальное видео MP4/WebM (до 48 МБ)
+           <input type="file" accept=".mp4,.webm,video/mp4,video/webm" :disabled="busy" @change="uploadVideo($event,'about')"/>
+         </label>
         <label>Автор фото<input v-model="draft.about.photoCredit" :disabled="!canEdit" @input="touch"/></label>
         <h3>Факты</h3><label v-for="(_,index) in draft.about.facts" :key="index">
           Факт {{index+1}}<textarea v-model="draft.about.facts[index]" rows="2" :disabled="!canEdit" @input="touch"/></label>
