@@ -6,7 +6,7 @@ const path=require('node:path');
 const {pathToFileURL}=require('node:url');
 const {sameMainFrame,sameFile,sameLocalPage,trustedFrame}=require('./trust.cjs');
 
-const file=path.join(process.cwd(),'desktop','first-run.html');
+const file=path.resolve(__dirname,'..','first-run.html');
 const setupUrl=pathToFileURL(file).href;
 const origin='http://127.0.0.1:41042';
 function windowMock(url){
