@@ -6,7 +6,7 @@ import { posterFileStream, type PosterRepository } from './posters.js';
 import { validateScheduleFields, type ScheduleRepository } from './schedule.js';
 import {validateEvent,type EventsRepository} from './events.js';
 import {documentStream,type DocumentRepository} from './documents.js';
-import { defaultThemeSettings,isThemeId,THEME_NAMES, VISITOR_THEME_IDS,type ThemeRepository } from './themes.js';
+import { defaultThemeSettings,isThemeId,isHexColor,THEME_NAMES, VISITOR_THEME_IDS,type ThemeRepository } from './themes.js';
 import {CultureMedia,defaultCultureState,validateCulture,restoreMissingStarterContent,type CultureRepository} from './culture.js';
 import {cultureWithOptionalSchedule} from './culture-availability.js';
 
@@ -221,7 +221,8 @@ export function createApp(options: AppOptions) {
   app.get('/api/public/theme',async (_request,reply)=>{
     reply.header('Cache-Control','no-store');
     const selected=themes?await themes.get():defaultThemeSettings();
-    return {theme:selected.published,revision:selected.published_revision,fullscreenEnabled:selected.fullscreenEnabled};
+    return {theme:selected.published,revision:selected.published_revision,fullscreenEnabled:selected.fullscreenEnabled,
+      dkBackground:selected.dkBackground,dkGlow:selected.dkGlow};
   });
   app.get('/api/editor/theme',async (request,reply)=>{
     const account=await requireRole(request,reply,['admin','editor','viewer']);
@@ -265,6 +266,18 @@ export function createApp(options: AppOptions) {
     await store.audit(account.id,'theme.fullscreen',{enabled,revision:result.revision});
     reply.header('Cache-Control','no-store');return {settings:result};
   });
+  app.post<{Body:{background?:unknown;glow?:unknown;expectedRevision?:unknown}}>(
+    '/api/editor/theme/dk-colors',async(request,reply)=>{
+      const account=await requireRole(request,reply,['admin']);if(!account)return;
+      if(!themes)return reply.code(503).send({error:'Хранилище тем не настроено'});
+      const {background,glow,expectedRevision}=request.body??{};
+      if(!isHexColor(background)||!isHexColor(glow)||!Number.isSafeInteger(expectedRevision)||
+        Number(expectedRevision)<1)return reply.code(400).send({error:'Нужны два цвета HEX и корректная версия'});
+      const result=await themes.setDkColors(background,glow,Number(expectedRevision));
+      if(!result)return reply.code(409).send({error:'Настройки изменены другим сотрудником. Обновите страницу'});
+      await store.audit(account.id,'theme.dk-colors',{revision:result.revision});
+      reply.header('Cache-Control','no-store');return {settings:result};
+    });
   // Browser schedule editor: drafts are private, only published snapshots reach the kiosk.
   app.get('/api/editor/schedule', async (request, reply) => {
     const account = await requireRole(request, reply, ['admin','editor','viewer']);
