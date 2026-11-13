@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {visiblePosterWindow,shouldReturnHome,posterSwipe} from './kiosk-behavior.ts';
+import {visiblePosterWindow,shouldReturnHome,posterSwipe,sectionSwipe} from './kiosk-behavior.ts';
 test('poster filmstrip handles zero, one and two posters',()=>{
   assert.deepEqual(visiblePosterWindow([],0),[]);
   assert.deepEqual(visiblePosterWindow(['a'],0),[{poster:'a',index:0}]);
@@ -27,4 +27,13 @@ test('swipe left and right navigates, while taps and vertical scrolling do not',
   assert.equal(posterSwipe(40,3),null);
   assert.equal(posterSwipe(-190,260),null);
   assert.equal(posterSwipe(Number.NaN,2),null);
+});
+
+test('section swipes never hijack vertical page movement',()=>{
+  assert.equal(sectionSwipe(-160,12),1);
+  assert.equal(sectionSwipe(150,8),-1);
+  assert.equal(sectionSwipe(78,0),null);
+  assert.equal(sectionSwipe(120,110),null);
+  assert.equal(sectionSwipe(0,200),null);
+  assert.equal(sectionSwipe(Number.NaN,4),null);
 });
