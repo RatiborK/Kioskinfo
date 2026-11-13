@@ -233,3 +233,53 @@ button,[role=button],a,select,input[type=checkbox],input[type=radio],
   .screen-shell .side-menu{height:auto;max-height:25dvh;touch-action:pan-x pan-y}
   .screen-shell.kiosk-home .screen-content{overflow:hidden}
 }
+
+/* Stage 05.9.2 — low-distraction scroll affordance. Button appears only if
+   more content is below and stays outside the document/video/checkout viewport. */
+.screen-shell .kiosk-scroll-cue{
+  position:absolute;
+  bottom:clamp(14px,3vh,28px);
+  left:calc((100% - clamp(270px,24vw,360px))/2);
+  transform:translateX(-50%);
+  display:grid;place-items:center;width:52px;height:52px;min-height:52px;
+  z-index:7;border:1px solid var(--v-line);
+  border-radius:50%;color:var(--v-text);
+  background:var(--v-card);
+  opacity:.78;box-shadow:0 5px 22px #0000002e;
+  touch-action:manipulation;
+  animation:kiosk-scroll-breathe 4.2s ease-in-out infinite;
+}
+.screen-shell .kiosk-scroll-cue:focus-visible{
+  outline:3px solid var(--v-alt);outline-offset:3px;opacity:1;
+}
+.screen-shell .kiosk-scroll-cue:active{opacity:1}
+@keyframes kiosk-scroll-breathe{
+  0%,100%{opacity:.65}
+  50%{opacity:.94}
+}
+@media(max-width:950px){
+  .screen-shell .kiosk-scroll-cue{left:50%;bottom:calc(25dvh + 12px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .screen-shell .kiosk-scroll-cue{animation:none;opacity:.8}
+}
+.poster-upload-report{
+  margin:14px 0;padding:16px;border:1px solid #51585d;
+  background:#1e252b;border-radius:10px;max-height:50vh;overflow-y:auto;
+  touch-action:pan-y
+}
+.poster-upload-report>strong{display:block;margin-bottom:12px}
+.poster-upload-report-list{display:flex;flex-direction:column;gap:6px}
+.poster-upload-report-row{display:grid;grid-template-columns:minmax(0,2.4fr) 95px minmax(0,1.3fr);gap:10px;
+  align-items:center;border:1px solid #495157;border-radius:7px;padding:10px 12px;background:#27323b;
+  font-size:13px;line-height:1.4;overflow-wrap:anywhere
+}
+.poster-upload-filename{font-weight:700;min-width:0}
+.poster-upload-filesize{color:#b9c9d2;font-variant-numeric:tabular-nums}
+.poster-upload-success .poster-upload-file-status{color:#b5edc6}
+.poster-upload-error .poster-upload-file-status{color:#ffb5a3}
+.poster-upload-uploading .poster-upload-file-status{color:#e9dfab}
+@media(max-width:660px){
+  .poster-upload-report-row{grid-template-columns:1fr auto;gap:6px}
+  .poster-upload-file-status{grid-column:1/-1}
+}
