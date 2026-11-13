@@ -1,7 +1,7 @@
 // apps/web/src/utils/dk-colors.test.ts — validate colors and adapt ink on both background extremes.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {DK_BACKGROUND,DK_GLOW,dkThemeVars,normalizeHex} from './dk-colors.js';
+import {DK_BACKGROUND,DK_GLOW,dkThemeVars,normalizeHex} from './dk-colors.ts';
 test('hex color input has closed format; arbitrary CSS cannot enter variables',()=>{
   assert.equal(normalizeHex('#AaBBcc',DK_BACKGROUND),'#aabbcc');
   for(const invalid of ['red','#abc','#ffffff;opacity:0','url(javascript:x)',null,'#12345678'])
