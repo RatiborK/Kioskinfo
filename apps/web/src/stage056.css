@@ -395,3 +395,45 @@
 :is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="aurora"] .dk-brand-lockup,
 :is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="neon"] .dk-brand-lockup,
 .editor-brand-logo.dk-brand-lockup{--dk-logo-ink:#f2f7fb}
+
+/* A compact, centered staff login keyboard: every character stays on its own row.
+   Never wrap the Cyrillic middle row into scattered fragments. */
+.login-panel .login-touch-keyboard{width:100%;max-width:520px;box-sizing:border-box;padding:11px}
+.login-panel .login-touch-keyboard .kiosk-keyboard{
+  display:flex;flex-direction:column;gap:5px;width:100%;max-width:100%;padding:0;
+  border:0;background:transparent
+}
+.login-panel .login-touch-keyboard .kiosk-keyboard-row{
+  display:flex;flex-wrap:nowrap;justify-content:center;align-items:center;
+  gap:3px;overflow-x:auto;scrollbar-width:thin;min-width:0
+}
+.login-panel .login-touch-keyboard .kiosk-key{
+  flex:0 1 32px;min-width:24px;min-height:42px;padding:4px 1px;
+  background:#292929;color:#f7f7f7;border:1px solid #656565;
+  border-radius:6px;font-size:clamp(13px,1.15vw,18px);font-weight:750
+}
+.login-panel .login-touch-keyboard .kiosk-keyboard-tools{gap:4px}
+.login-panel .login-touch-keyboard .kiosk-key-action{
+  flex:0 1 auto;min-width:50px;max-width:none;padding:5px 7px;font-size:12px
+}
+.login-panel .login-touch-keyboard .kiosk-key-space{
+  flex:1 1 78px;min-width:50px;max-width:120px;font-size:13px
+}
+/* Browser fullscreen (not a synthetic F11 key). */
+.editor-header-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px}
+.editor-fullscreen-button{background:transparent;font:inherit;cursor:pointer}
+.editor-fullscreen-button:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.screen-shell .kiosk-fullscreen-trigger{
+  flex:0 0 auto;min-height:46px;padding:8px 12px;
+  color:var(--v-text);background:var(--v-card);border:1px solid var(--v-line);
+  border-radius:9px;font:inherit;font-size:12px;font-weight:700;cursor:pointer
+}
+.screen-shell .kiosk-fullscreen-trigger:focus-visible{outline:2px solid var(--v-alt)}
+.visitor-kiosk-settings{
+  margin-top:22px;padding:18px 20px;border:1px solid #4c5055;border-radius:10px;background:#1c1c1c
+}
+.visitor-kiosk-settings h3{margin:0 0 14px;font-size:18px;color:#f4f2ec}
+.visitor-kiosk-fullscreen{display:flex;flex-direction:row;align-items:center;gap:12px;color:#f4f2ec;cursor:pointer}
+.visitor-kiosk-fullscreen input{width:22px;height:22px;flex:0 0 22px;accent-color:#ff6a00}
+.visitor-kiosk-settings p{margin:13px 0 0;font-size:13px}
+@media(max-width:580px){.editor-header-actions{width:100%}.login-panel .login-touch-keyboard .kiosk-key{min-width:23px;font-size:13px}}
