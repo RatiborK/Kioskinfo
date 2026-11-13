@@ -74,6 +74,24 @@ async function save():Promise<boolean>{
   }catch(e){error.value=messageOf(e);message.value='Правки остались на экране';return false;}
   finally{busy.value=false;}
 }
+async function restoreStarter(){
+  if(props.role!=='admin'||busy.value||!state.value)return;
+  if(!await save())return;
+  if(!window.confirm('Восстановить только недостающие исходные коллективы, руководителей и памятки? Ваши правки не будут заменены. Изменения сохранятся как черновик.'))return;
+  busy.value=true;error.value='';message.value='Восстанавливаем недостающие материалы…';
+  try{
+    const result=await api<{state:CultureState;added:{categories:number;leaders:number;collectives:number;safety:number}}>('/api/editor/culture/restore-starter',{
+      method:'POST',headers,body:JSON.stringify({expectedRevision:state.value.revision}),
+    });
+    setState(result.state);
+    const {categories,leaders,collectives,safety}=result.added;
+    const total=categories+leaders+collectives+safety;
+    message.value=total?
+      'Восстановлены недостающие материалы: '+collectives+' коллективов, '+leaders+' руководителей, '+categories+' категорий, '+safety+' памяток. Проверьте и нажмите «Опубликовать».':
+      'Базовое наполнение уже на месте. Ничего не перезаписывалось.';
+  }catch(e){error.value=messageOf(e);message.value='Исходные данные не изменены';}
+  finally{busy.value=false;}
+}
 async function publish(){
   if(props.role!=='admin'||!state.value||!await save())return;
   busy.value=true;error.value='';message.value='Публикация…';
@@ -148,11 +166,13 @@ onMounted(()=>{void load();});
         <p>Редактируйте коллективы, руководителей, страницы и медиа. Впервые загружены проверяемые стартовые сведения из расписания.</p></div>
       <div class="culture-editor-actions">
         <button type="button" class="secondary-button" :disabled="busy" @click="load">Обновить</button>
+        <button v-if="role==='admin'" type="button" class="secondary-button" :disabled="busy||!state" @click="restoreStarter">Восстановить наполнение</button>
         <button v-if="canEdit" type="button" class="secondary-button" :disabled="busy||!dirty" @click="save">Сохранить черновик</button>
         <button v-if="role==='admin'" type="button" class="primary-button" :disabled="busy" @click="publish">Опубликовать на экране</button>
       </div>
     </div>
     <p role="status" class="status-line">{{message}}</p><p v-if="error" class="editor-error" role="alert">{{error}}</p>
+    <p v-if="error&&!draft" class="editor-hint">Если загрузка не удаётся, проверьте сервер API и сохранённый каталог <code>content/culture/catalog.json</code>. Данные не сбрасываются автоматически.</p>
     <nav class="culture-editor-tabs" aria-label="Состав материалов">
       <button v-for="tab in panels" :key="tab.id" type="button" :class="{active:selectedPanel===tab.id}"
         @click="selectPanel(tab.id)">{{tab.name}}</button>

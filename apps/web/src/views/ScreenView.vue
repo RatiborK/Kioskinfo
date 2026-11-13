@@ -7,6 +7,7 @@ import DocumentLibrary from '../components/DocumentLibrary.vue';
 import CollectivesDirectory from '../components/CollectivesDirectory.vue';
 import CultureLanding from '../components/CultureLanding.vue';
 import NavigationPanel from '../components/NavigationPanel.vue';
+import KioskMenuIcon from '../components/KioskMenuIcon.vue';
 import GlobalSearch from '../components/GlobalSearch.vue';
 import TicketWidget from '../components/TicketWidget.vue';
 import MediaViewer from '../components/MediaViewer.vue';
@@ -32,6 +33,7 @@ const initial=route.query.section;
 const current=ref<Section>(items.some(x=>x.id===initial)?initial as Section:'posters');
 const scrollRegion=ref<HTMLElement|null>(null);
 const culture=ref<CultureContent|null>(null);
+const cultureError=ref('');
 const events=ref<PublicEvent[]>([]);
 const documents=ref<PublicDocument[]>([]);
 type Poster={name:string;title:string;kind:'image'|'video';url:string;updatedAt:string};
@@ -131,9 +133,19 @@ function resetIdle(){
   lastActivity=Date.now();
 }
 async function reloadCulture(){
-  try{const r=await fetch('/api/public/culture',{cache:'no-store'});if(!r.ok)return;
-    const data:{content:CultureContent}=await r.json();culture.value=data.content;
-  }catch{/* Keep previous published version. */}
+  try{
+    const r=await fetch('/api/public/culture',{cache:'no-store'});
+    if(!r.ok)throw Error('Сервер вернул '+r.status);
+    const data:{content:CultureContent}=await r.json();
+    if(!data.content||!Array.isArray(data.content.collectives)||!Array.isArray(data.content.leaders))
+      throw Error('Некорректный формат каталога');
+    culture.value=data.content;
+    cultureError.value='';
+  }catch(error){
+    // Never erase the last loaded catalog; show why its latest revision is unavailable.
+    const detail=error instanceof Error?error.message:String(error);
+    cultureError.value='Каталог ДК временно недоступен ('+detail+'). Ранее опубликованные материалы не удалены.';
+  }
 }
 async function reloadEvents(){
   try{const r=await fetch('/api/public/events',{cache:'no-store'});if(!r.ok)return;
@@ -204,6 +216,10 @@ onBeforeUnmount(()=>{
           </button>
           <span class="stage-note">ДК «КИРОВСКИЙ» · КРАСНОЯРСК</span>
         </header>
+        <div v-if="cultureError" class="kiosk-culture-warning" role="status">
+          <span>{{cultureError}}</span>
+          <button type="button" @click="reloadCulture">Повторить загрузку</button>
+        </div>
         <section v-if="current==='posters'" class="poster-gallery kiosk-home-gallery" aria-label="Актуальные афиши">
           <div class="poster-heading kiosk-home-heading"><span class="hero-overline">СКОРО НА СЦЕНЕ</span>
             <h1 data-page-title tabindex="-1">Афиша<span class="dot">.</span></h1></div>
@@ -284,7 +300,11 @@ onBeforeUnmount(()=>{
       <button v-for="(item,index) in items" :key="item.id" type="button" class="nav-item"
         :class="{active:current===item.id}" :aria-current="current===item.id?'page':undefined" @click="go(item.id)">
         <span class="nav-index">{{String(index+1).padStart(2,'0')}}</span>
-        <span class="nav-label">{{item.label}}</span><span class="nav-glyph">{{item.icon}}</span>
+        <span class="nav-label">{{item.label}}</span>
+        <span class="nav-glyph" :class="{'nav-glyph-original':item.id==='posters'||item.id==='calendar'}">
+          <template v-if="item.id==='posters'||item.id==='calendar'">{{item.icon}}</template>
+          <KioskMenuIcon v-else :name="item.id"/>
+        </span>
       </button>
       <a href="/editor" class="kiosk-admin-shortcut" aria-label="Войти в кабинет администратора">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"

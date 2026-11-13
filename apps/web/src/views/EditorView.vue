@@ -15,8 +15,8 @@ const eventEditor=ref<{flush:()=>Promise<boolean>}|null>(null);
 const cultureEditor=ref<{flush:()=>Promise<boolean>}|null>(null);
 const route=useRoute(),router=useRouter();
 const tabs=[
-  {id:'posters',label:'Афиши',number:'01'},
-  {id:'culture',label:'Наполнение ДК',number:'02'},
+  {id:'culture',label:'Наполнение ДК',number:'01'},
+  {id:'posters',label:'Афиши',number:'02'},
   {id:'calendar',label:'Календарь',number:'03'},
   {id:'documents',label:'Документы',number:'04'},
   {id:'pages',label:'Страницы',number:'05'},
@@ -96,8 +96,15 @@ async function loadPages() {
   if(current) usePage(current);
 }
 async function refreshSession(){
-  try {const data:{user:Account}=await api('/api/auth/me'); user.value=data.user; await loadPages();}
-  catch {user.value=null;status.value='Войдите для редактирования';}
+  try {
+    const data:{user:Account}=await api('/api/auth/me');
+    user.value=data.user;
+  }catch {
+    user.value=null;status.value='Войдите для редактирования';return;
+  }
+  // A failed ancillary pages request must not hide an authorized culture editor.
+  try{await loadPages();}
+  catch(e){error.value='Загрузка списка страниц не удалась: '+String(e instanceof Error?e.message:e)+'. Раздел «Наполнение ДК» остаётся доступным.';}
 }
 async function selectPage(page:Page) {
   if(!await flushPage())return;

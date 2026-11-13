@@ -1,7 +1,7 @@
 // apps/api/src/culture.ts — versioned site-wide cultural content and curated image library.
 import {randomUUID} from 'node:crypto';
 import {createReadStream} from 'node:fs';
-import {mkdir,readFile,rename,rm,stat,writeFile} from 'node:fs/promises';
+import {copyFile,mkdir,readFile,rename,rm,stat,writeFile} from 'node:fs/promises';
 import {dirname,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import type pg from 'pg';
@@ -156,36 +156,26 @@ export function validateCulture(value:unknown):CultureContent {
 // until an editor explicitly saves/publishes; all custom authored fields survive.
 export function enrichLegacySafety(content:CultureContent):CultureContent{
   const copy=structuredClone(content);
-  // Add new, reviewed materials without replacing text authored by employees.
-  const existingIds=new Set(copy.safety.sections.map(x=>x.id));
-  for(const section of starterContent.safety.sections){
-    if(!existingIds.has(section.id))copy.safety.sections.push(structuredClone(section));
-  }
-  const old=copy.safety.sections;
-  const legacy=old.some(s=>s.id==='objects'||s.id==='health');
-  if(legacy){
-    const current=new Map(old.map(x=>[x.id,x]));
-    copy.safety.sections=starterContent.safety.sections.map(section=>{
-      const found=current.get(section.id);
-      return found?found:structuredClone(section);
-    });
-    for(const [previous,target] of [['objects','terrorism'],['health','zozh']] as const){
-      const omitted=current.get(previous);
-      const destination=copy.safety.sections.find(s=>s.id===target);
-      if(omitted&&destination){
-        for(const paragraph of omitted.paragraphs){
-          if(destination.paragraphs.length<15&&!destination.paragraphs.includes(paragraph))
-            destination.paragraphs.push(paragraph);
-        }
-      }
+  // Preserve every authored paragraph, title, custom section and its original order.
+  // New educational topics are appended; never silently replace the editor's records.
+  const known=new Set(copy.safety.sections.map(x=>x.id));
+  for(const suggested of starterContent.safety.sections){
+    if(!known.has(suggested.id)&&copy.safety.sections.length<25){
+      copy.safety.sections.push(structuredClone(suggested));
+      known.add(suggested.id);
     }
-    if(copy.safety.title==='Безопасность начинается с внимания')copy.safety.title=starterContent.safety.title;
+  }
+  const legacy=known.has('objects')||known.has('health');
+  if(legacy){
+    if(copy.safety.title==='Безопасность начинается с внимания')
+      copy.safety.title=starterContent.safety.title;
     if(copy.safety.intro==='Собрали памятки, которые помогут чувствовать себя уверенно в ДК. Информация ознакомительная; приоритет всегда у объявлений и указаний сотрудников учреждения.')
       copy.safety.intro=starterContent.safety.intro;
     if(copy.safety.notice==='Это общие рекомендации для посетителей, а не утверждённая инструкция по эвакуации. Схемы выходов и локальные инструкции учреждения требуют отдельного согласования.')
       copy.safety.notice=starterContent.safety.notice;
   }
-  // The previous edition used a different ticket platform. Don't expose it in the kiosk.
+  // The partner has changed but all staff-authored fields outside the legacy
+  // default URL remain untouched.
   if(copy.tickets.url==='https://gorodsobitiy.ru/venues/dk-kirovsky'){
     copy.tickets=structuredClone(starterContent.tickets);
   }
@@ -198,6 +188,28 @@ export const defaultCultureState=():CultureState=>({
   revision:1,publishedRevision:1,draft:structuredClone(starterContent),
   published:structuredClone(starterContent),updatedAt:new Date(0).toISOString(),
 });
+/** Restores only missing source-backed DK catalog items. Existing employee records,
+ * metadata, photos, paragraphs, IDs and published content are never overwritten. */
+export function restoreMissingStarterContent(current:CultureContent):{
+ content:CultureContent;
+ added:{categories:number;leaders:number;collectives:number;safety:number}
+}{
+ const next=structuredClone(current);
+ const insert=<T extends {id:string}>(target:T[],source:readonly T[],limit:number)=>{
+   const known=new Set(target.map(x=>x.id));let count=0;
+   for(const item of source){
+     if(!known.has(item.id)&&target.length<limit){
+       target.push(structuredClone(item));known.add(item.id);count++;
+     }
+   }
+   return count;
+ };
+ const categories=insert(next.categories,starterContent.categories,20);
+ const leaders=insert(next.leaders,starterContent.leaders,120);
+ const collectives=insert(next.collectives,starterContent.collectives,250);
+ const safety=insert(next.safety.sections,starterContent.safety.sections,25);
+ return {content:validateCulture(next),added:{categories,leaders,collectives,safety}};
+}
 function normalizeState(value:unknown):CultureState{
   const r=asObject(value),revision=Number(r.revision),pr=Number(r.publishedRevision);
   if(!Number.isSafeInteger(revision)||revision<1||!Number.isSafeInteger(pr)||pr<1||pr>revision)
@@ -208,24 +220,37 @@ function normalizeState(value:unknown):CultureState{
 export class FileCultureRepository implements CultureRepository{
   private chain:Promise<void>=Promise.resolve();
   private lastGood=defaultCultureState();
+  private hasPersistedSnapshot=false;
   constructor(private readonly path=cultureFile()){}
   private async readStrict(){
     try{
       if((await stat(this.path)).size>MAX_BYTES*2+3000)throw Error('Каталог превышает допустимый размер');
       const state=upgraded(normalizeState(JSON.parse(await readFile(this.path,'utf8'))));
-      this.lastGood=structuredClone(state);return state;
+      this.lastGood=structuredClone(state);this.hasPersistedSnapshot=true;return state;
     }catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return structuredClone(this.lastGood);throw e;}
   }
   private async write(value:CultureState){
     const dest=resolve(this.path),temp=dest+'.'+randomUUID()+'.tmp';await mkdir(dirname(dest),{recursive:true});
     try{await writeFile(temp,JSON.stringify(value,null,2)+'\n',{flag:'wx',mode:0o600});
-      await rename(temp,dest);this.lastGood=structuredClone(value);
+      // Keep the last committed on-disk state before any update or publication.
+      try{await copyFile(dest,dest+'.previous');}
+      catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
+      await rename(temp,dest);this.lastGood=structuredClone(value);this.hasPersistedSnapshot=true;
     }finally{await rm(temp,{force:true}).catch(()=>{});}
   }
   private async locked<T>(work:()=>Promise<T>):Promise<T>{
     const result=this.chain.then(work);this.chain=result.then(()=>{},()=>{});return result;
   }
-  async get(){await this.chain;try{return await this.readStrict();}catch{return structuredClone(this.lastGood);}}
+  async get(){
+    await this.chain;
+    try{return await this.readStrict();}
+    catch(error){
+      // A malformed persisted file on a fresh process must not look like a new,
+      // empty installation. Surface the error instead of silently showing seed data.
+      if(!this.hasPersistedSnapshot)throw error;
+      return structuredClone(this.lastGood);
+    }
+  }
   async update(content:CultureContent,expectedRevision:number){
     return this.locked(async()=>{
       const old=await this.readStrict();

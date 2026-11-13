@@ -186,3 +186,54 @@
 .login-touch-keyboard .kiosk-key:hover,.login-touch-keyboard .kiosk-key:focus-visible{
   background:#ff6a00;color:#111;border-color:#ff6a00}
 @media(max-width:720px){.login-touch-keyboard .kiosk-key{min-width:31px;flex-basis:31px;font-size:15px}}
+
+/* Stage 05.6.1: cultural thematic pictograms, keeping original poster/calendar signs. */
+.screen-shell .nav-glyph{
+  display:inline-flex;justify-content:center;align-items:center;
+  flex:0 0 40px;width:40px;height:40px;
+  color:var(--v-alt);background:var(--v-card);border:1px solid var(--v-line);
+  border-radius:10px;line-height:1;
+  transition:color .18s ease,background-color .18s ease,border-color .18s ease;
+}
+.screen-shell .nav-glyph svg{width:27px;height:27px;display:block;flex:0 0 27px}
+.screen-shell .nav-glyph-original{
+  font-size:26px;font-weight:800;color:var(--v-accent);
+  border-color:transparent;background:transparent
+}
+.screen-shell .nav-item.active .nav-glyph:not(.nav-glyph-original),
+.screen-shell .nav-item:hover .nav-glyph:not(.nav-glyph-original){
+  color:var(--v-accent);border-color:var(--v-accent);
+}
+.screen-shell[data-visitor-theme="dk"] .nav-item .nav-glyph{color:#0b5ba8}
+.screen-shell[data-visitor-theme="dk"] .nav-item .nav-glyph-original{color:#ff6a00}
+.screen-shell[data-visitor-theme="dk"] .nav-item.active .nav-glyph,
+.screen-shell[data-visitor-theme="dk"] .nav-item:hover .nav-glyph{
+  color:#ea6100;border-color:#ffd2b0;background:#fff6ef
+}
+.screen-shell[data-visitor-theme="dk"] .nav-item.active .nav-glyph-original,
+.screen-shell[data-visitor-theme="dk"] .nav-item:hover .nav-glyph-original{
+  background:transparent;border-color:transparent;color:#e75c00
+}
+/* A catalog outage should never look like deleted content. */
+.screen-shell .kiosk-culture-warning{
+  flex:0 0 auto;min-height:45px;display:flex;align-items:center;gap:12px;
+  flex-wrap:wrap;padding:10px 14px;margin:9px 0;border-left:4px solid #de6c23;
+  background:var(--v-card);color:var(--v-text);border-radius:8px;
+  font-size:13px;line-height:1.4
+}
+.screen-shell .kiosk-culture-warning span{flex:1 1 220px}
+.screen-shell .kiosk-culture-warning button{
+  min-height:42px;padding:8px 16px;border:1px solid var(--v-accent);
+  border-radius:8px;background:var(--v-bg);color:var(--v-text);font-weight:800
+}
+@media(max-width:950px){
+  .screen-shell .nav-glyph{display:inline-flex;width:34px;height:34px;flex:0 0 34px}
+  .screen-shell .nav-glyph svg{width:23px;height:23px}
+}
+@media(max-width:560px){
+  .screen-shell .nav-glyph{width:30px;height:30px;flex:0 0 30px}
+  .screen-shell .nav-glyph svg{width:21px;height:21px}
+}
+@media(prefers-reduced-motion:reduce){
+  .screen-shell .nav-glyph{transition:none}
+}

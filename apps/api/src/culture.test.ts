@@ -4,7 +4,7 @@ import {test} from 'node:test';
 import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {CultureMedia,FileCultureRepository,defaultCultureState,validateCulture,enrichLegacySafety} from './culture.js';
+import {CultureMedia,FileCultureRepository,defaultCultureState,validateCulture,enrichLegacySafety,restoreMissingStarterContent} from './culture.js';
 
 test('initial DK catalog is substantial, categorized and source-backed',()=>{
   const original=defaultCultureState().published;
@@ -96,7 +96,9 @@ test('Stage 05.4 safety upgrade preserves employee text while adding prevention 
   previous.safety.notice='Утверждено ответственным лицом';
   previous.tickets.url='https://gorodsobitiy.ru/venues/dk-kirovsky';
   const next=enrichLegacySafety(previous);
-  assert.equal(next.safety.sections.length,17);
+  assert.equal(next.safety.sections.length,19);
+  assert.equal(next.safety.sections.find(x=>x.id==='objects')?.paragraphs[0],'Пожалуйста, предупредите персонал');
+  assert.equal(next.safety.sections.find(x=>x.id==='health')?.paragraphs[0],'Помогите ближнему');
   assert.ok(next.safety.sections.some(section=>section.id==='bullying'));
   assert.ok(next.safety.sections.some(section=>section.id==='corruption'));
   assert.equal(next.safety.sections.find(x=>x.id==='fire')?.paragraphs[0],'Авторизованный текст');
@@ -131,4 +133,66 @@ test('pre-navigation revisions are upgraded without destroying employee content'
  const result=validateCulture(old);
  assert.equal(result.navigation.floors.length,3);
  assert.equal(result.collectives.length,defaultCultureState().draft.collectives.length);
+});
+
+test('persisted catalog creates a recovery snapshot and never silently resets on restart',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-retain-')),path=join(dir,'catalog.json');
+  try{
+    const repo=new FileCultureRepository(path);
+    const initial=await repo.get();
+    const draft=structuredClone(initial.draft);
+    draft.collectives[0].history='Локальная история, которую нельзя потерять';
+    draft.leaders[0].bio='Биография сотрудника';
+    await repo.update(draft,1);
+    await repo.publish(2);
+    const previous=JSON.parse(await readFile(path+'.previous','utf8')) as {draft:{collectives:{history:string}[]}};
+    assert.equal(previous.draft.collectives[0].history,'Локальная история, которую нельзя потерять');
+    const restarted=new FileCultureRepository(path);
+    assert.equal((await restarted.get()).published.leaders[0].bio,'Биография сотрудника');
+    await writeFile(path,'{invalid json');
+    const fresh=new FileCultureRepository(path);
+    await assert.rejects(()=>fresh.get()); // Do not pretend employee data was replaced with seed.
+    assert.equal((await readFile(path+'.previous','utf8')).includes('Биография сотрудника'),true);
+    assert.equal(await readFile(path,'utf8'),'{invalid json'); // no destructive auto-repair
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('custom safety sections remain intact across additive migration',()=>{
+  const old=structuredClone(defaultCultureState().draft);
+  old.safety.sections=[
+   {id:'objects',title:'Исходная инструкция ДК',subtitle:'Текст сотрудника',icon:'shield',paragraphs:['Не менять пункт']},
+   {id:'staff-training',title:'Охрана труда',subtitle:'Памятка',icon:'shield',paragraphs:['Авторский контент']}
+  ];
+  const repaired=enrichLegacySafety(old);
+  assert.equal(repaired.safety.sections[0].title,'Исходная инструкция ДК');
+  assert.equal(repaired.safety.sections[1].paragraphs[0],'Авторский контент');
+  assert.ok(repaired.safety.sections.length>=17);
+  assert.ok(repaired.safety.sections.some(x=>x.id==='extremism'));
+  assert.doesNotThrow(()=>validateCulture(repaired));
+});
+
+test('restore missing starter content only, never replace employee-authored content or published snapshots',()=>{
+  const original=defaultCultureState();
+  const catalog=structuredClone(original.draft);
+  catalog.collectives[1].description='Полностью согласованное описание коллектива';
+  catalog.leaders[1].bio='Биография после редактирования';
+  catalog.safety.sections[1].paragraphs[0]='Утверждённая памятка';
+  catalog.collectives.shift();
+  catalog.leaders.shift();
+  catalog.categories.shift();
+  catalog.safety.sections.shift();
+  const {content,added}=restoreMissingStarterContent(catalog);
+  assert.deepEqual(added,{categories:1,leaders:1,collectives:1,safety:1});
+  assert.equal(content.collectives.length,original.draft.collectives.length);
+  assert.equal(content.leaders.length,original.draft.leaders.length);
+  assert.equal(content.categories.length,original.draft.categories.length);
+  assert.equal(content.collectives.find(x=>x.id===original.draft.collectives[1].id)?.description,
+    'Полностью согласованное описание коллектива');
+  assert.equal(content.leaders.find(x=>x.id===original.draft.leaders[1].id)?.bio,
+    'Биография после редактирования');
+  assert.equal(content.safety.sections.find(x=>x.id===original.draft.safety.sections[1].id)?.paragraphs[0],
+    'Утверждённая памятка');
+  const again=restoreMissingStarterContent(content);
+  assert.deepEqual(again.added,{categories:0,leaders:0,collectives:0,safety:0});
+  assert.deepEqual(again.content,content);
+  assert.equal(original.published.collectives[0].history,original.draft.collectives[0].history);
 });

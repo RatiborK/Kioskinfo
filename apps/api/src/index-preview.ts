@@ -44,7 +44,14 @@ if(configuredPassword&&password.length<12)
   process.stderr.write('[NAVIKULTURA DEV] Короткий пароль разрешён только на 127.0.0.1. Для эксплуатации требуется другой, более сильный пароль.\n');
 const store=new LocalDevStore(await hashPassword(password));
 const scheduleRepo=new FileScheduleRepository();
-const importedCards=await seedPreviewSchedule(scheduleRepo);
+let importedCards=0;
+try{importedCards=await seedPreviewSchedule(scheduleRepo);}
+catch(error){
+  // The retired schedule store must not prevent the editor, published culture
+  // and existing photos/documents from starting.
+  process.stderr.write('[NAVIKULTURA] Старое расписание недоступно; культурный каталог продолжит работу: '+
+    (error instanceof Error?error.message:String(error))+'\n');
+}
 const app=createApp({store,posters:new FolderPosterRepository(),schedule:scheduleRepo,themes:new FileThemeRepository(),events:new FileEventsRepository(),documents:new FolderDocumentsRepository(),culture:new FileCultureRepository(),cultureMedia:new CultureMedia(),allowedOrigin:'http://127.0.0.1:5173'});
 try {
   await app.listen({host:'127.0.0.1',port:3100});
