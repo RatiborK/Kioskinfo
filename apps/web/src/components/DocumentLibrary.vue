@@ -34,9 +34,11 @@ watch(()=>props.documents,docs=>{
 <template>
   <section class="documents-visitor" aria-label="Документы Дворца культуры">
     <div v-if="selected" class="document-reading-room">
-      <button type="button" class="schedule-back" @click="back">← Все документы</button>
-      <div class="document-reading-header"><span class="eyebrow">ОФИЦИАЛЬНЫЙ ДОКУМЕНТ · {{selected.format.toUpperCase()}}</span>
-        <h2>{{selected.title}}</h2><span class="document-reading-rule"></span></div>
+      <div class="document-reading-meta">
+        <button type="button" class="schedule-back" @click="back">← Все документы</button>
+        <div class="document-reading-header"><span class="eyebrow">ОФИЦИАЛЬНЫЙ ДОКУМЕНТ · {{selected.format.toUpperCase()}}</span>
+          <h2>{{selected.title}}</h2><span class="document-reading-rule"></span></div>
+      </div>
       <div v-if="busy" class="document-loading" role="status">Открываем документ…</div>
       <p v-if="error" class="poster-warning" role="alert">{{error}}</p>
       <article v-if="selected.format==='docx'&&!busy&&!error" class="document-paper" v-html="html"></article>
