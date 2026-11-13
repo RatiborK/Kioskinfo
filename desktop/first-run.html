@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+<title>НавиКультура — первичная настройка</title>
+<link rel="stylesheet" href="./first-run.css">
+</head>
+<body>
+<main class="layout">
+  <section class="setup">
+    <div class="label">ДК «КИРОВСКИЙ» / НАВИКУЛЬТУРА</div>
+    <h1>Первый запуск<span>.</span></h1>
+    <p>Создайте пароль администратора этого компьютера. После настройки НавиКультура откроется на весь экран.</p>
+    <form id="form" autocomplete="off">
+      <label>Логин<input value="admin" autocomplete="off" readonly aria-label="Логин администратора"></label>
+      <label>Новый пароль <small>От 12 до 128 символов</small>
+        <input type="password" id="password" required minlength="12" maxlength="128" autocomplete="new-password">
+      </label>
+      <label>Повторите пароль
+        <input type="password" id="confirm" required minlength="12" maxlength="128" autocomplete="new-password">
+      </label>
+      <p class="error" role="alert" id="error"></p>
+      <button type="submit" id="submit">Создать администратора и открыть экран</button>
+    </form>
+    <p class="notice">Пароль не поставляется вместе с EXE и не отправляется в интернет. Настройки сохраняются в вашем профиле Windows. Для входа используйте пункт «Вход в админку».</p>
+  </section>
+</main>
+<script src="./first-run.js"></script>
+</body>
+</html>
