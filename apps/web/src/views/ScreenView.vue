@@ -214,7 +214,6 @@ onBeforeUnmount(()=>{
               <path d="M5 9h1m3 0h1m3 0h1m3 0h1M5 12h1m3 0h1m3 0h1m3 0h1M7 16h10" stroke-linecap="round"/>
             </svg>
           </button>
-          <span class="stage-note">ДК «КИРОВСКИЙ» · КРАСНОЯРСК</span>
         </header>
         <div v-if="cultureError" class="kiosk-culture-warning" role="status">
           <span>{{cultureError}}</span>
