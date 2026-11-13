@@ -4,7 +4,7 @@ import {test} from 'node:test';
 import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {CultureMedia,FileCultureRepository,defaultCultureState,validateCulture,enrichLegacySafety,restoreMissingStarterContent} from './culture.js';
+import {CultureMedia,CultureVideos,FileCultureRepository,defaultCultureState,validateCulture,enrichLegacySafety,restoreMissingStarterContent} from './culture.js';
 
 test('initial DK catalog is substantial, categorized and source-backed',()=>{
   const original=defaultCultureState().published;
@@ -195,4 +195,25 @@ test('restore missing starter content only, never replace employee-authored cont
   assert.deepEqual(again.added,{categories:0,leaders:0,collectives:0,safety:0});
   assert.deepEqual(again.content,content);
   assert.equal(original.published.collectives[0].history,original.draft.collectives[0].history);
+});
+
+test('local video media are signature checked and published through UUID URL only',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-video-'));
+  try{
+    const media=new CultureVideos(dir);
+    const bytes=Buffer.concat([Buffer.from([0,0,0,16]),Buffer.from('ftypisom'),Buffer.alloc(40)]);
+    const url=await media.upload('tour.mp4',bytes);
+    assert.match(url,/^\/api\/public\/culture\/video\/[a-f0-9-]{36}\.mp4$/);
+    const name=url.split('/').pop()!;
+    const info=await media.info(name);
+    assert.equal(info?.mime,'video/mp4');
+    assert.equal(info?.size,bytes.length);
+    assert.equal(await media.info('../secret.mp4'),null);
+    await assert.rejects(()=>media.upload('fake.webm',bytes),/видеоформату/);
+    const catalog=structuredClone(defaultCultureState().draft);
+    catalog.about.videoUrl=url;
+    assert.equal(validateCulture(catalog).about.videoUrl,url);
+    catalog.about.videoUrl='javascript:alert(1)';
+    assert.throws(()=>validateCulture(catalog));
+  }finally{await rm(dir,{recursive:true,force:true});}
 });
