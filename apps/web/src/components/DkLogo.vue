@@ -2,10 +2,14 @@
      Local vector recreation of the DK Kirovsky mark from the supplied image.
      Replace with the institution's approved master SVG when available.
      No external image requests; the wordmark stays visible on every visitor theme. -->
+<script setup lang="ts">
+import {useId} from 'vue';
+const titleId=useId();
+</script>
 <template>
   <svg class="dk-brand-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 424 96"
-    role="img" aria-labelledby="dk-logo-title" preserveAspectRatio="xMinYMid meet">
-    <title id="dk-logo-title">Кировский — Дворец культуры</title>
+    role="img" :aria-labelledby="titleId" preserveAspectRatio="xMinYMid meet">
+    <title :id="titleId">Кировский — Дворец культуры</title>
     <g class="dk-brand-symbol">
       <!-- Angular letter K / architectural silhouette -->
       <path fill="#17191c" d="M7 29 25 18v61L7 71Z"/>
