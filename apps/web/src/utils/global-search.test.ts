@@ -8,8 +8,8 @@ const sample:CultureContent={
   {id:'floor-1',title:'Первый этаж',note:'Основной уровень',points:[
   {id:'dance-studio',title:'Кабинет 39',kind:'studio',x:36,y:44,description:'Танцевальная студия'}
  ]},
-  {id:'floor-2',title:'Верхний уровень',note:'',points:[]},
-  {id:'floor-3',title:'Знаки',note:'',points:[]},
+  {id:'floor-2',title:'Схема верхнего уровня',note:'',points:[{id:'hidden',title:'Старая точка',kind:'other',x:50,y:50,description:'Архивный проход'}]},
+  {id:'floor-3',title:'Схема с обозначениями',note:'',points:[]},
  ]},
  about:{title:'Дворец культуры Кировский',intro:'История учреждения',facts:[],history:[],videoUrl:'',photo:'',photoCredit:'',sourceUrl:''},
  safety:{title:'Безопасность',intro:'',notice:'',sections:[
@@ -41,6 +41,9 @@ test('query matching is case and ё/е insensitive with multiple words',()=>{
  assert.deepEqual(searchKiosk(data,'кружок РАДУГА').map(x=>x.id),['rainbow']);
  assert.deepEqual(searchKiosk(data,'неизвестно'),[]);
  assert.ok(searchKiosk(data,'первый этаж').some(x=>x.id==='floor-1'))
+ assert.ok(searchKiosk(data,'второй этаж').some(x=>x.id==='floor-3'&&x.title==='Второй этаж'));
+ assert.equal(searchKiosk(data,'старая точка').length,0);
+ assert.equal(searchKiosk(data,'верхнего уровня').length,0);
  assert.ok(searchKiosk(data,'танцевальная студия').some(x=>x.id==='dance-studio'&&x.floorId==='floor-1'));
 
 });
