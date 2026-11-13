@@ -71,3 +71,20 @@ test('fullscreen preference persists, defaults off and keeps old theme snapshots
     await assert.rejects(()=>repo.setFullscreen('yes' as unknown as boolean,7));
   }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('DK background and glow persist independently and refuse injected colors',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-dk-palette-'));
+  try{
+    const file=join(dir,'palette.json'),repo=new FileThemeRepository(file);
+    const first=await repo.setDkColors('#1A2637','#E3A12F',1);
+    assert.equal(first?.dkBackground,'#1a2637');
+    assert.equal(first?.dkGlow,'#e3a12f');
+    assert.equal(first?.revision,2);
+    assert.equal(await repo.setDkColors('#eeeeee','#eeeeee',1),null);
+    const next=new FileThemeRepository(file);
+    assert.equal((await next.get()).dkGlow,'#e3a12f');
+    await assert.rejects(()=>next.setDkColors('#000000; color:red','#abcdef',2),/Недопустимые/);
+    await assert.rejects(()=>next.setDkColors('#abcdef','red',2),/Недопустимые/);
+    assert.equal((await next.get()).dkBackground,'#1a2637');
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
