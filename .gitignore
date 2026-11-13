@@ -26,3 +26,7 @@ backups/
 # The source is separately distributed; do not accidentally commit office floor plans.
 apps/web/public/assets/navigation/*.webp
 apps/web/public/assets/safety/*.webp
+
+# Local Electron build outputs, not source or institutional data.
+desktop/bundled/
+desktop/dist/
