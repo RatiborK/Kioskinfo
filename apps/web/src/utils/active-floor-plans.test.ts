@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import type {CultureNavigation} from './culture-types.js';
-import {visibleFloorPlans,isVisibleFloorPlan} from './active-floor-plans.js';
+import {visibleFloorPlans,isVisibleFloorPlan} from './active-floor-plans.ts';
 
 const fixture:CultureNavigation={
   title:'Навигация',intro:'',notice:'',floors:[
