@@ -5,8 +5,8 @@ const props=defineProps<{modelValue:string}>();
 const emit=defineEmits<{'update:modelValue':[value:string];close:[]}>();
 const layout=ref<'ru'|'en'>('ru');
 const keys=computed(()=>layout.value==='ru'
-  ? ['йцукенгшщзхъ','фывапролджэ','ячсмитьбю']
-  : ['qwertyuiop','asdfghjkl','zxcvbnm']);
+  ? ['1234567890','йцукенгшщзхъ','фывапролджэ','ячсмитьбю','.,-@_']
+  : ['1234567890','qwertyuiop','asdfghjkl','zxcvbnm','.,-@_']);
 function append(letter:string){if(props.modelValue.length<80)emit('update:modelValue',props.modelValue+letter);}
 function backspace(){emit('update:modelValue',Array.from(props.modelValue).slice(0,-1).join(''));}
 </script>
