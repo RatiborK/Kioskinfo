@@ -1,7 +1,7 @@
 // apps/web/src/utils/video-sources.test.ts — links must become players, never full websites.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {resolveVideoSource} from './video-sources.js';
+import {resolveVideoSource} from './video-sources.ts';
 test('YouTube watch, shorts and shortlinks resolve to an embedded player only',()=>{
   const expected='https://www.youtube-nocookie.com/embed/M7lc1UVf-VE?rel=0';
   for(const value of [
