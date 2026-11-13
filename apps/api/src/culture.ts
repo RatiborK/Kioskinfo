@@ -208,24 +208,34 @@ function normalizeState(value:unknown):CultureState{
 export class FileCultureRepository implements CultureRepository{
   private chain:Promise<void>=Promise.resolve();
   private lastGood=defaultCultureState();
+  private hasPersistedSnapshot=false;
   constructor(private readonly path=cultureFile()){}
   private async readStrict(){
     try{
       if((await stat(this.path)).size>MAX_BYTES*2+3000)throw Error('Каталог превышает допустимый размер');
       const state=upgraded(normalizeState(JSON.parse(await readFile(this.path,'utf8'))));
-      this.lastGood=structuredClone(state);return state;
+      this.lastGood=structuredClone(state);this.hasPersistedSnapshot=true;return state;
     }catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return structuredClone(this.lastGood);throw e;}
   }
   private async write(value:CultureState){
     const dest=resolve(this.path),temp=dest+'.'+randomUUID()+'.tmp';await mkdir(dirname(dest),{recursive:true});
     try{await writeFile(temp,JSON.stringify(value,null,2)+'\n',{flag:'wx',mode:0o600});
-      await rename(temp,dest);this.lastGood=structuredClone(value);
+      await rename(temp,dest);this.lastGood=structuredClone(value);this.hasPersistedSnapshot=true;
     }finally{await rm(temp,{force:true}).catch(()=>{});}
   }
   private async locked<T>(work:()=>Promise<T>):Promise<T>{
     const result=this.chain.then(work);this.chain=result.then(()=>{},()=>{});return result;
   }
-  async get(){await this.chain;try{return await this.readStrict();}catch{return structuredClone(this.lastGood);}}
+  async get(){
+    await this.chain;
+    try{return await this.readStrict();}
+    catch(error){
+      // A malformed persisted file on a fresh process must not look like a new,
+      // empty installation. Surface the error instead of silently showing seed data.
+      if(!this.hasPersistedSnapshot)throw error;
+      return structuredClone(this.lastGood);
+    }
+  }
   async update(content:CultureContent,expectedRevision:number){
     return this.locked(async()=>{
       const old=await this.readStrict();
