@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FolderPosterRepository } from './posters.js';
+import { FolderPosterRepository,MAX_POSTER_UPLOAD_BYTES } from './posters.js';
 
 // One tiny transparent PNG; tests verify catalog and byte signatures, not image content rendering.
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXjoAAAAASUVORK5CYII=', 'base64');
@@ -52,4 +52,27 @@ test('direct folder MP4 appears in the catalog (browser playback depends on code
     assert.equal(list.posters[0].kind,'video');
     assert.equal(list.posters[0].mime,'video/mp4');
   } finally { await rm(dir, { recursive:true, force:true }); }
+});
+
+test('binary images accept GIF AVIF and BMP signatures and preserve 20MiB limit',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-posters20-'));
+  try{
+    const store=new FolderPosterRepository(dir);
+    const gif=Buffer.concat([Buffer.from('GIF89a'),Buffer.alloc(32)]);
+    const avif=Buffer.alloc(32);avif.write('ftypavif',4,'ascii');
+    const bmp=Buffer.concat([Buffer.from('BM'),Buffer.alloc(32)]);
+    assert.equal((await store.uploadBytes('Анимация.gif',gif)).mime,'image/gif');
+    assert.equal((await store.uploadBytes('Современный.avif',avif)).mime,'image/avif');
+    assert.equal((await store.uploadBytes('Плакат.bmp',bmp)).mime,'image/bmp');
+    const big=Buffer.alloc(MAX_POSTER_UPLOAD_BYTES);
+    gif.copy(big,0,0,6);
+    const maxItem=await store.uploadBytes('Полный_размер.gif',big);
+    assert.equal(maxItem.sizeBytes,MAX_POSTER_UPLOAD_BYTES);
+    const tooLarge=Buffer.alloc(MAX_POSTER_UPLOAD_BYTES+1);
+    gif.copy(tooLarge,0,0,6);
+    await assert.rejects(()=>store.uploadBytes('too-big.gif',tooLarge),/INVALID_MEDIA/);
+    await assert.rejects(()=>store.uploadBytes('wrong.jpg',gif),/INVALID_MEDIA/);
+    await assert.rejects(()=>store.uploadBytes('../bad.gif',gif),/INVALID_FILENAME/);
+    assert.equal((await store.list()).posters.length,4);
+  }finally{await rm(dir,{recursive:true,force:true});}
 });
