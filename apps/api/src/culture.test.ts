@@ -96,7 +96,7 @@ test('Stage 05.4 safety upgrade preserves employee text while adding prevention 
   previous.safety.notice='Утверждено ответственным лицом';
   previous.tickets.url='https://gorodsobitiy.ru/venues/dk-kirovsky';
   const next=enrichLegacySafety(previous);
-  assert.equal(next.safety.sections.length,15);
+  assert.equal(next.safety.sections.length,17);
   assert.ok(next.safety.sections.some(section=>section.id==='bullying'));
   assert.ok(next.safety.sections.some(section=>section.id==='corruption'));
   assert.equal(next.safety.sections.find(x=>x.id==='fire')?.paragraphs[0],'Авторизованный текст');
