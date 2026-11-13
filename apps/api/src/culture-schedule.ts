@@ -15,10 +15,18 @@ export function enrichCollectivesWithSchedule(content:CultureContent,entries:rea
     if(item.time&&(!group.schedule||group.schedule===starter?.schedule))group.schedule=item.time;
     if(item.room&&(!group.room||group.room===starter?.room))group.room=item.room;
     if(item.age&&(!group.age||group.age===starter?.age))group.age=item.age;
+    // The previous editor stored schedules separately. Publish a richer narrative
+    // using only verified fields, not guesses. Keep custom collective copy untouched.
     const custom=item.description.trim();
-    if(custom&&!generated(custom)&&generated(group.description)){
-      const outline=custom.slice(0,2800);
-      group.description=outline;
+    if(generated(group.description)&&!group.description.includes('\nЗанятия:')){
+      const introduction=(custom&&!generated(custom)?custom:group.description).trim();
+      const notes=[
+        group.programs.length?'Группы: '+group.programs.join(', '):'',
+        group.age?'Возраст: '+group.age:'',
+        group.schedule?'Занятия: '+group.schedule:'',
+        group.room?'Помещение: '+group.room:'',
+      ].filter(Boolean);
+      group.description=[introduction,...notes].join('\n').slice(0,3000);
     }
   }
   return result;
