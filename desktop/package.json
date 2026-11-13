@@ -1,13 +1,13 @@
 {
   "name": "navikultura-portable",
   "productName": "НавиКультура",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "main": "main.cjs",
   "description": "Автономный полноэкранный терминал ДК Кировский для Windows",
   "scripts": {
     "stage": "node scripts/stage.cjs",
-    "package:win": "electron-builder --config builder.yml --win portable --x64",
+    "package:win": "electron-builder --config builder.yml --win --x64",
     "test": "node --test lib/store.test.cjs lib/trust.test.cjs"
   },
   "dependencies": {
