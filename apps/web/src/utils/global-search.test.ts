@@ -5,7 +5,9 @@ import {searchKiosk} from './global-search.ts';
 import type {CultureContent} from './culture-types.js';
 const sample:CultureContent={
  navigation:{title:'План ДК',intro:'',notice:'',floors:[
-  {id:'floor-1',title:'Первый этаж',note:'',points:[]},
+  {id:'floor-1',title:'Первый этаж',note:'Основной уровень',points:[
+  {id:'dance-studio',title:'Кабинет 39',kind:'studio',x:36,y:44,description:'Танцевальная студия'}
+ ]},
   {id:'floor-2',title:'Верхний уровень',note:'',points:[]},
   {id:'floor-3',title:'Знаки',note:'',points:[]},
  ]},
@@ -37,4 +39,7 @@ test('query matching is case and ё/е insensitive with multiple words',()=>{
  assert.deepEqual(searchKiosk(data,'ДВОРЕЦ КУЛЬТУРЫ').map(x=>x.section),['about']);
  assert.deepEqual(searchKiosk(data,'кружок РАДУГА').map(x=>x.id),['rainbow']);
  assert.deepEqual(searchKiosk(data,'неизвестно'),[]);
+ assert.deepEqual(searchKiosk(data,'первый этаж').map(x=>x.id),['floor-1']);
+ assert.ok(searchKiosk(data,'танцевальная студия').some(x=>x.id==='dance-studio'&&x.floorId==='floor-1'));
+
 });
