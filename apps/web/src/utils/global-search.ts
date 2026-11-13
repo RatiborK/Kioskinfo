@@ -1,3 +1,4 @@
+import {visibleFloorPlans} from './active-floor-plans.ts';
 // apps/web/src/utils/global-search.ts
 // Full-kiosk local search: only previously published data, never unapproved drafts.
 import {normalizeSearch,queryVariants} from './kiosk-search.ts';
@@ -14,7 +15,7 @@ export function searchKiosk(data:SearchData,query:string,max=70):KioskSearchResu
   const push=(item:KioskSearchResult,haystack:string)=>rows.push({item,haystack:normalizeSearch(haystack)});
   const c=data.culture;
   if(c){
-    for(const floor of c.navigation.floors){
+    for(const floor of visibleFloorPlans(c.navigation)){
       push({id:floor.id,section:'navigation',kind:'Навигация',title:floor.title,
         subtitle:floor.note,floorId:floor.id},
         [floor.title,floor.note,c.navigation.title,'навигация этаж план карта'].join(' '));
