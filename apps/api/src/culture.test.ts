@@ -4,7 +4,7 @@ import {test} from 'node:test';
 import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {CultureMedia,FileCultureRepository,defaultCultureState,validateCulture,enrichLegacySafety} from './culture.js';
+import {CultureMedia,FileCultureRepository,defaultCultureState,validateCulture,enrichLegacySafety,restoreMissingStarterContent} from './culture.js';
 
 test('initial DK catalog is substantial, categorized and source-backed',()=>{
   const original=defaultCultureState().published;
@@ -168,4 +168,31 @@ test('custom safety sections remain intact across additive migration',()=>{
   assert.ok(repaired.safety.sections.length>=17);
   assert.ok(repaired.safety.sections.some(x=>x.id==='extremism'));
   assert.doesNotThrow(()=>validateCulture(repaired));
+});
+
+test('restore missing starter content only, never replace employee-authored content or published snapshots',()=>{
+  const original=defaultCultureState();
+  const catalog=structuredClone(original.draft);
+  catalog.collectives[1].description='Полностью согласованное описание коллектива';
+  catalog.leaders[1].bio='Биография после редактирования';
+  catalog.safety.sections[1].paragraphs[0]='Утверждённая памятка';
+  catalog.collectives.shift();
+  catalog.leaders.shift();
+  catalog.categories.shift();
+  catalog.safety.sections.shift();
+  const {content,added}=restoreMissingStarterContent(catalog);
+  assert.deepEqual(added,{categories:1,leaders:1,collectives:1,safety:1});
+  assert.equal(content.collectives.length,original.draft.collectives.length);
+  assert.equal(content.leaders.length,original.draft.leaders.length);
+  assert.equal(content.categories.length,original.draft.categories.length);
+  assert.equal(content.collectives.find(x=>x.id===original.draft.collectives[1].id)?.description,
+    'Полностью согласованное описание коллектива');
+  assert.equal(content.leaders.find(x=>x.id===original.draft.leaders[1].id)?.bio,
+    'Биография после редактирования');
+  assert.equal(content.safety.sections.find(x=>x.id===original.draft.safety.sections[1].id)?.paragraphs[0],
+    'Утверждённая памятка');
+  const again=restoreMissingStarterContent(content);
+  assert.deepEqual(again.added,{categories:0,leaders:0,collectives:0,safety:0});
+  assert.deepEqual(again.content,content);
+  assert.equal(original.published.collectives[0].history,original.draft.collectives[0].history);
 });
