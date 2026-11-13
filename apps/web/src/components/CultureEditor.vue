@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import {computed,onMounted,ref} from 'vue';
 import NavigationPanel from './NavigationPanel.vue';
+import {isVisibleFloorPlan} from '../utils/active-floor-plans.js';
 import type {CultureContent,CultureCollective,CultureLeader,CultureState,FloorPoint} from '../utils/culture-types.js';
 type Role='admin'|'editor'|'viewer';
 const props=defineProps<{role:Role}>();
@@ -271,10 +272,11 @@ onMounted(()=>{void load();});
         <label>Вступление<textarea v-model="draft.navigation.intro" rows="3" maxlength="1300" :disabled="!canEdit" @input="touch"/></label>
         <NavigationPanel :navigation="draft.navigation" :editable="canEdit"
           @add-point="addNavPoint" @select-point="chooseNavPoint"/>
-        <h3>Названия уровней</h3>
-        <div v-for="floor in draft.navigation.floors" :key="floor.id" class="culture-safety-edit-card">
-          <label>Название схемы {{floor.id}}<input v-model="floor.title" maxlength="100" :disabled="!canEdit" @input="touch"/></label>
-          <label>Примечание<textarea v-model="floor.note" rows="2" maxlength="260" :disabled="!canEdit" @input="touch"/></label>
+        <h3>Планы этажей</h3>
+        <p>Сейчас доступны первый и второй этажи. Схема верхнего уровня сохранена в архивных данных, но скрыта. Третий этаж добавим отдельно.</p>
+        <div v-for="floor in draft.navigation.floors.filter(f=>isVisibleFloorPlan(f.id))" :key="floor.id" class="culture-safety-edit-card">
+          <strong>{{floor.id==='floor-3'?'Второй этаж':'Первый этаж'}}</strong>
+          <label>Примечание для посетителей<textarea v-model="floor.note" rows="2" maxlength="260" :disabled="!canEdit" @input="touch"/></label>
         </div>
         <div v-if="navPoint" class="culture-safety-edit-card">
           <h3>Выбранный объект</h3>
