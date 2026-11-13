@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "typecheck": "vue-tsc --noEmit",
     "build": "vue-tsc --noEmit && vite build",
-    "test": "node --test src/utils/kiosk-search.test.ts src/utils/kiosk-behavior.test.ts src/utils/global-search.test.ts src/utils/branding.test.ts src/utils/active-floor-plans.test.ts"
+    "test": "node --test src/utils/kiosk-search.test.ts src/utils/kiosk-behavior.test.ts src/utils/global-search.test.ts src/utils/branding.test.ts src/utils/active-floor-plans.test.ts src/utils/dk-colors.test.ts src/utils/video-sources.test.ts"
   },
   "dependencies": {
     "vue": "^3.5.22",
