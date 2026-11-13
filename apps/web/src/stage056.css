@@ -482,3 +482,11 @@
 .visitor-dk-color-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:16px}
 .visitor-dk-color-actions .editor-hint{margin:0;max-width:410px;font-size:13px}
 @media(max-width:650px){.visitor-dk-color-grid{grid-template-columns:1fr}}
+
+.visitor-dk-color-field input[type=color]{
+  border-radius:50%;width:72px;height:72px;overflow:hidden
+}
+.visitor-dk-color-field input[type=color]::-webkit-color-swatch-wrapper{padding:2px}
+.visitor-dk-color-field input[type=color]::-webkit-color-swatch{border-radius:50%;border:0}
+.visitor-dk-color-field input[type=color]::-moz-color-swatch{border-radius:50%;border:0}
+.culture-edit-video-upload input[type=file]{font-size:13px;max-width:100%}
