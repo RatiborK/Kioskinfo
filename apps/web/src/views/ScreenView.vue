@@ -6,6 +6,7 @@ import EventCalendar from '../components/EventCalendar.vue';
 import DocumentLibrary from '../components/DocumentLibrary.vue';
 import CollectivesDirectory from '../components/CollectivesDirectory.vue';
 import CultureLanding from '../components/CultureLanding.vue';
+import NavigationPanel from '../components/NavigationPanel.vue';
 import GlobalSearch from '../components/GlobalSearch.vue';
 import TicketWidget from '../components/TicketWidget.vue';
 import MediaViewer from '../components/MediaViewer.vue';
@@ -38,7 +39,7 @@ const posters=ref<Poster[]>([]);
 const posterIndex=ref(0),posterError=ref('');
 const activePoster=computed(()=>posters.value[posterIndex.value]??null);
 const posterDots=computed(()=>visiblePosterWindow(posters.value,posterIndex.value,7));
-const globalSearchOpen=ref(false),ticketOpen=ref(false),ticketUrl=ref(MUZA_ORGANIZATION);
+const globalSearchOpen=ref(false),searchKeyboardRequested=ref(false),ticketOpen=ref(false),ticketUrl=ref(MUZA_ORGANIZATION);
 const activeVideo=ref<{url:string;title:string}|null>(null);
 const selectedGroupId=ref(''),groupMount=ref(0),selectedDocumentId=ref(
   typeof route.query.document==='string'?route.query.document:'');
@@ -71,7 +72,8 @@ function onEnter(){
     document.querySelector<HTMLElement>('.screen-content [data-page-title]')?.focus({preventScroll:true});
   }
 }
-function openSearch(){activity();globalSearchOpen.value=true;}
+function openSearch(){activity();searchKeyboardRequested.value=false;globalSearchOpen.value=true;}
+function openKeyboard(){activity();searchKeyboardRequested.value=true;globalSearchOpen.value=true;}
 function closeSearch(){activity();globalSearchOpen.value=false;}
 function openTickets(url=MUZA_ORGANIZATION){activity();ticketUrl.value=url;ticketOpen.value=true;globalSearchOpen.value=false;}
 function closeTickets(){activity();ticketOpen.value=false;}
@@ -191,6 +193,12 @@ onBeforeUnmount(()=>{
               <circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/>
             </svg>
           </button>
+          <button type="button" class="kiosk-keyboard-trigger" aria-label="Открыть экранную клавиатуру" title="Экранная клавиатура" @click="openKeyboard">
+            <svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+              <rect x="2" y="5" width="20" height="14" rx="2"/>
+              <path d="M5 9h1m3 0h1m3 0h1m3 0h1M5 12h1m3 0h1m3 0h1m3 0h1M7 16h10" stroke-linecap="round"/>
+            </svg>
+          </button>
           <span class="stage-note">ДК «КИРОВСКИЙ» · КРАСНОЯРСК</span>
         </header>
         <section v-if="current==='posters'" class="poster-gallery kiosk-home-gallery" aria-label="Актуальные афиши">
@@ -259,12 +267,8 @@ onBeforeUnmount(()=>{
         <section v-else-if="current==='contacts'" class="culture-section">
           <CultureLanding v-if="culture" :content="culture" mode="contacts"/>
         </section>
-        <section v-else class="hero">
-          <div class="hero-overline">ИНФОРМАЦИОННАЯ ПЛАТФОРМА</div>
-          <h1 data-page-title tabindex="-1">Навигация<span class="dot">.</span></h1>
-          <p>Интерактивная схема помещений Дворца культуры находится в разработке.</p>
-          <div class="feature-grid"><div class="feature-primary"><b>ПЛАН ДВОРЦА</b><span>Информация о помещениях</span></div>
-            <div class="feature-secondary"><b>СКОРО</b><span>Доступная навигация</span></div></div>
+        <section v-else class="culture-section kiosk-navigation-page" aria-label="Интерактивная поэтажная схема ДК">
+          <NavigationPanel v-if="culture" :navigation="culture.navigation"/>
         </section>
         <footer v-if="current!=='posters'" class="screen-footer">
           <span>НАВИГАЦИЯ · СОБЫТИЯ · ЛЮДИ</span><span>ГДК «КИРОВСКИЙ»</span>
@@ -287,6 +291,7 @@ onBeforeUnmount(()=>{
       <div class="menu-bottom">НАВИКУЛЬТУРА / 2026</div>
     </nav>
     <GlobalSearch v-if="globalSearchOpen" :data="{culture,events,documents,posters}"
+      :initial-keyboard="searchKeyboardRequested"
       @close="closeSearch" @open-result="openResult"/>
     <TicketWidget v-if="ticketOpen" :url="ticketUrl" @close="closeTickets"/>
     <MediaViewer v-if="activeVideo" :url="activeVideo.url" :title="activeVideo.title" @close="closeVideo"/>
