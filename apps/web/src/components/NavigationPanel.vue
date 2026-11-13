@@ -2,11 +2,13 @@
 <script setup lang="ts">
 import {computed,ref,watch} from 'vue';
 import type {CultureNavigation,CultureFloor,FloorPoint} from '../utils/culture-types.js';
+import {visibleFloorPlans} from '../utils/active-floor-plans.js';
 const props=withDefaults(defineProps<{navigation:CultureNavigation;editable?:boolean;initialFloor?:string;initialPoint?:string}>(),{editable:false});
 const emit=defineEmits<{(e:'add-point',value:{floorId:string;x:number;y:number}):void;
   (e:'select-point',value:{floorId:string;id:string}):void}>();
 const floorId=ref('floor-1'),selectedPoint=ref(''),zoom=ref(1),category=ref('all');
-const floor=computed<CultureFloor|undefined>(()=>props.navigation.floors.find(x=>x.id===floorId.value));
+const activeFloors=computed(()=>visibleFloorPlans(props.navigation));
+const floor=computed<CultureFloor|undefined>(()=>activeFloors.value.find(x=>x.id===floorId.value));
 const selected=computed<FloorPoint|undefined>(()=>floor.value?.points.find(x=>x.id===selectedPoint.value));
 const filtered=computed(()=>floor.value?.points.filter(x=>category.value==='all'||x.kind===category.value)??[]);
 const labels:Record<FloorPoint['kind'],string>={
@@ -23,11 +25,11 @@ function addPoint(event:MouseEvent){
  emit('add-point',{floorId:floorId.value,x,y});
 }
 function setZoom(delta:number){zoom.value=Math.max(1,Math.min(2.5,Math.round((zoom.value+delta)*10)/10));}
-watch(()=>props.navigation.floors,()=>{if(!props.navigation.floors.some(x=>x.id===floorId.value))floorId.value='floor-1';});
+watch(activeFloors,rows=>{if(!rows.some(x=>x.id===floorId.value))chooseFloor(rows[0]?.id??'floor-1');});
 watch(()=>[props.initialFloor,props.initialPoint] as const,([target,point])=>{
-  if(target&&props.navigation.floors.some(f=>f.id===target)){
+  if(target&&activeFloors.value.some(f=>f.id===target)){
     floorId.value=target;zoom.value=1;
-    selectedPoint.value=point&&props.navigation.floors.find(f=>f.id===target)?.points.some(x=>x.id===point)?point:'';
+    selectedPoint.value=point&&activeFloors.value.find(f=>f.id===target)?.points.some(x=>x.id===point)?point:'';
   }
 },{immediate:true});
 defineExpose({chooseFloor,choosePoint});
@@ -39,7 +41,7 @@ defineExpose({chooseFloor,choosePoint});
       <h2>{{navigation.title}}</h2><p>{{navigation.intro}}</p></div>
   </header>
   <nav class="floor-navigation-tabs" aria-label="Выбор схемы">
-    <button v-for="entry in navigation.floors" :key="entry.id" type="button"
+    <button v-for="entry in activeFloors" :key="entry.id" type="button"
       :class="{active:entry.id===floorId}" :aria-pressed="entry.id===floorId"
       @click="chooseFloor(entry.id)">{{entry.title}}</button>
   </nav>
