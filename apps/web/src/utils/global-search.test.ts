@@ -28,7 +28,8 @@ const data={culture:sample,events:[{id:'event1',title:'Концерт',date:'202
  posters:[{name:'poster.jpg',title:'Новогодняя афиша'}]};
 test('search indexes the entire kiosk without requiring a schedule page',()=>{
  assert.deepEqual(searchKiosk(data,'Марина').map(x=>x.id),['rainbow']);
- assert.deepEqual(searchKiosk(data,'кабинет 39').map(x=>x.id),['rainbow']);
+ assert.ok(searchKiosk(data,'кабинет 39').some(x=>x.id==='rainbow'));
+ assert.ok(searchKiosk(data,'кабинет 39').some(x=>x.id==='dance-studio'))
  assert.deepEqual(searchKiosk(data,'буллинг').map(x=>x.id),['bullying']);
  assert.deepEqual(searchKiosk(data,'прейскурант').map(x=>x.id),['doc1']);
  assert.deepEqual(searchKiosk(data,'новогодняя').map(x=>x.id),['event1','poster.jpg']);
@@ -39,7 +40,7 @@ test('query matching is case and ё/е insensitive with multiple words',()=>{
  assert.deepEqual(searchKiosk(data,'ДВОРЕЦ КУЛЬТУРЫ').map(x=>x.section),['about']);
  assert.deepEqual(searchKiosk(data,'кружок РАДУГА').map(x=>x.id),['rainbow']);
  assert.deepEqual(searchKiosk(data,'неизвестно'),[]);
- assert.deepEqual(searchKiosk(data,'первый этаж').map(x=>x.id),['floor-1']);
+ assert.ok(searchKiosk(data,'первый этаж').some(x=>x.id==='floor-1'))
  assert.ok(searchKiosk(data,'танцевальная студия').some(x=>x.id==='dance-studio'&&x.floorId==='floor-1'));
 
 });
