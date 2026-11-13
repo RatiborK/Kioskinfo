@@ -364,3 +364,13 @@
   .screen-shell .kiosk-dk-logo .dk-brand-subline{font-size:6px}
   .screen-shell .kiosk-dk-logo .dk-brand-city{font-size:6px}
 }
+
+/* Keep the approved blue/orange SVG inks; a fine cool halo lifts blue strokes
+   against the new slate background without adding icon frames. */
+.screen-shell[data-visitor-theme="dk"] .nav-glyph .kiosk-menu-svg,
+.visitor-theme-preview[data-visitor-theme="dk"] .kiosk-menu-svg{
+  filter:drop-shadow(0 0 1px #edf8ffc0) drop-shadow(0 0 3px #93ccff4d);
+}
+.screen-shell[data-visitor-theme="dk"] :is(button,a,input):focus-visible{
+  outline-color:#98d9ea;
+}
