@@ -44,6 +44,7 @@ const activeVideo=ref<{url:string;title:string}|null>(null);
 const selectedGroupId=ref(''),groupMount=ref(0),selectedDocumentId=ref(
   typeof route.query.document==='string'?route.query.document:'');
 const selectedEventDate=ref(''),pendingSafetyId=ref('');
+const selectedFloorId=ref('floor-1'),selectedMapPoint=ref('');
 type VisitorTheme='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
 const visitorTheme=ref<VisitorTheme>('dk'),knownThemes=new Set(['dk','holiday','modern','aurora','poster','gallery','neon','kids']);
 let refreshTimer:ReturnType<typeof setInterval>|undefined;
@@ -96,6 +97,8 @@ function openResult(result:KioskSearchResult){
     current.value='posters';
     const index=posters.value.findIndex(x=>x.name===result.posterName);
     if(index>=0)posterIndex.value=index;
+  }else if(result.section==='navigation'){
+    current.value='navigation';selectedFloorId.value=result.floorId??'floor-1';selectedMapPoint.value=result.pointId??'';
   }else if(result.section==='about'||result.section==='contacts'){
     current.value=result.section;
   }
@@ -268,7 +271,8 @@ onBeforeUnmount(()=>{
           <CultureLanding v-if="culture" :content="culture" mode="contacts"/>
         </section>
         <section v-else class="culture-section kiosk-navigation-page" aria-label="Интерактивная поэтажная схема ДК">
-          <NavigationPanel v-if="culture" :navigation="culture.navigation"/>
+          <NavigationPanel v-if="culture" :navigation="culture.navigation"
+            :initial-floor="selectedFloorId" :initial-point="selectedMapPoint"/>
         </section>
         <footer v-if="current!=='posters'" class="screen-footer">
           <span>НАВИГАЦИЯ · СОБЫТИЯ · ЛЮДИ</span><span>ГДК «КИРОВСКИЙ»</span>
