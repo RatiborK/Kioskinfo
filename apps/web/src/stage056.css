@@ -7,12 +7,18 @@
     linear-gradient(155deg,#354e6055,transparent 48%,#1e334344);
   isolation:isolate;
 }
-.screen-shell[data-visitor-theme="dk"] .screen-content::after{
-  content:"";position:absolute;top:-23%;left:-31%;width:70%;height:75%;
+/* Persistent compositor: the keyed screen-content remounts on navigation.
+   Keeping the glow on main.screen-shell avoids resetting its 46-second timeline. */
+.screen-shell[data-visitor-theme="dk"]{position:relative;isolation:isolate;overflow:hidden}
+.screen-shell[data-visitor-theme="dk"]::before{
+  content:"";position:absolute;top:-23%;left:-31%;width:74%;height:75%;
   background:radial-gradient(ellipse at center,#4ca1af70 0%,#4ca1af2c 36%,transparent 74%);
-  filter:blur(28px);pointer-events:none;z-index:-1;
+  filter:blur(28px);pointer-events:none;z-index:0;
   animation:dk-ambient-glow 46s ease-in-out infinite alternate;
   will-change:transform;
+}
+.screen-shell[data-visitor-theme="dk"] .screen-content{
+  background-color:transparent;z-index:1;
 }
 .visitor-theme-preview[data-visitor-theme="dk"]{position:relative;isolation:isolate}
 .visitor-theme-preview[data-visitor-theme="dk"]::after{
@@ -26,7 +32,7 @@
   to{transform:translate3d(94%,5%,0)}
 }
 @media(prefers-reduced-motion:reduce){
-  .screen-shell[data-visitor-theme="dk"] .screen-content::after,
+  .screen-shell[data-visitor-theme="dk"]::before,
   .visitor-theme-preview[data-visitor-theme="dk"]::after{animation:none;will-change:auto}
 }
 .screen-shell[data-visitor-theme="dk"] .side-menu{
@@ -365,12 +371,27 @@
   .screen-shell .kiosk-dk-logo .dk-brand-city{font-size:6px}
 }
 
-/* Keep the approved blue/orange SVG inks; a fine cool halo lifts blue strokes
-   against the new slate background without adding icon frames. */
-.screen-shell[data-visitor-theme="dk"] .nav-glyph .kiosk-menu-svg,
-.visitor-theme-preview[data-visitor-theme="dk"] .kiosk-menu-svg{
-  filter:drop-shadow(0 0 1px #edf8ffc0) drop-shadow(0 0 3px #93ccff4d);
-}
+/* Icon paths keep their approved original colors; no glow or highlighted frame. */
+.screen-shell .nav-glyph .kiosk-menu-svg,
+.visitor-theme-preview .kiosk-menu-svg{filter:none!important}
 .screen-shell[data-visitor-theme="dk"] :is(button,a,input):focus-visible{
   outline-color:#98d9ea;
 }
+
+/* Stage 05.8.1 — no white badge behind the logo, readable ink on all themes. */
+.dk-brand-lockup,.screen-shell .kiosk-dk-logo.dk-brand-lockup,
+.editor-brand-logo.dk-brand-lockup,.visitor-theme-preview .theme-mini-dk-logo.dk-brand-lockup{
+  --dk-logo-ink:#0c0c0e;
+  background:transparent!important;color:var(--dk-logo-ink)!important;
+}
+.dk-brand-lockup .dk-brand-mark{color:var(--dk-logo-ink);max-width:27%;flex:0 0 auto}
+.dk-brand-lockup .dk-brand-wordmark,
+.dk-brand-lockup .dk-brand-name,
+.dk-brand-lockup .dk-brand-subline,
+.dk-brand-lockup .dk-brand-city{color:var(--dk-logo-ink)!important}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="dk"] .dk-brand-lockup,
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="holiday"] .dk-brand-lockup,
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="modern"] .dk-brand-lockup,
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="aurora"] .dk-brand-lockup,
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="neon"] .dk-brand-lockup,
+.editor-brand-logo.dk-brand-lockup{--dk-logo-ink:#f2f7fb}
