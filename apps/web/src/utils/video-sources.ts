@@ -21,7 +21,7 @@ export function resolveVideoSource(value:unknown):VideoSource|null{
     return id&&YT.test(id)?{kind:'embed',src:'https://www.youtube-nocookie.com/embed/'+id+'?rel=0'}:null;
   }
   if(['rutube.ru','www.rutube.ru'].includes(host)){
-    const id=path.match(/^\/(?:video|play\/embed)\/([0-9a-f]{32})$/i)?.[1];
+    const id=path.match(/^\/(?:video(?:\/private)?|play\/embed)\/([0-9a-f]{32})$/i)?.[1];
     if(!id||!RUTUBE.test(id))return null;
     const p=url.searchParams.get('p');
     if(p&&!/^[A-Za-z0-9_-]{1,120}$/.test(p))return null;
