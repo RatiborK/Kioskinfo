@@ -4,7 +4,7 @@ import {test} from 'node:test';
 import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {CultureMedia,FileCultureRepository,defaultCultureState,validateCulture} from './culture.js';
+import {CultureMedia,FileCultureRepository,defaultCultureState,validateCulture,enrichLegacySafety} from './culture.js';
 
 test('initial DK catalog is substantial, categorized and source-backed',()=>{
   const original=defaultCultureState().published;
@@ -15,7 +15,7 @@ test('initial DK catalog is substantial, categorized and source-backed',()=>{
   assert.equal(new Set(original.leaders.map(l=>l.id)).size,original.leaders.length);
   assert.ok(original.collectives.every(c=>c.source.startsWith('Расписание занятий') && c.sourcePage>=1));
   assert.ok(original.leaders.every(l=>l.photo===''));
-  assert.equal(original.tickets.url,'https://gorodsobitiy.ru/venues/dk-kirovsky');
+  assert.equal(original.tickets.url,'https://muzaticket.ru/iframe/organizations/organization-mau-gdk-kirovskii-448753');
   assert.ok(original.safety.sections.length>=6);
 });
 test('editing catalog does not change visitor content before publication',async()=>{
@@ -80,4 +80,29 @@ test('photo library accepts signature-checked PNG and rejects scripts or fake JP
     await assert.rejects(()=>media.upload('fake.jpg',Buffer.from('not a jpg').toString('base64')));
     assert.equal(await media.file('../../etc/passwd'),null);
   }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('Stage 05.4 safety upgrade preserves employee text while adding prevention topics',()=>{
+  const previous=structuredClone(defaultCultureState().published);
+  previous.safety.sections=[
+    {id:'fire',title:'Правила пожарной безопасности ДК',subtitle:'Изменено сотрудником',icon:'fire',paragraphs:['Авторизованный текст']},
+    {id:'evac',title:'Эвакуация',subtitle:'',icon:'exit',paragraphs:['Эвакуация']},
+    {id:'objects',title:'Подозрительные предметы',subtitle:'',icon:'shield',paragraphs:['Пожалуйста, предупредите персонал']},
+    {id:'children',title:'Дети',subtitle:'',icon:'family',paragraphs:['Дети']},
+    {id:'health',title:'Самочувствие',subtitle:'',icon:'heart',paragraphs:['Помогите ближнему']},
+    {id:'digital',title:'Данные',subtitle:'',icon:'lock',paragraphs:['Не сообщайте коды']},
+  ];
+  previous.safety.intro='Согласовано с администрацией ДК';
+  previous.safety.notice='Утверждено ответственным лицом';
+  previous.tickets.url='https://gorodsobitiy.ru/venues/dk-kirovsky';
+  const next=enrichLegacySafety(previous);
+  assert.equal(next.safety.sections.length,15);
+  assert.ok(next.safety.sections.some(section=>section.id==='bullying'));
+  assert.ok(next.safety.sections.some(section=>section.id==='corruption'));
+  assert.equal(next.safety.sections.find(x=>x.id==='fire')?.paragraphs[0],'Авторизованный текст');
+  assert.equal(next.safety.intro,'Согласовано с администрацией ДК');
+  assert.equal(next.safety.notice,'Утверждено ответственным лицом');
+  assert.match(next.tickets.url,/muzaticket\.ru\/iframe/);
+  assert.equal(previous.safety.sections.length,6);
+  assert.doesNotThrow(()=>validateCulture(next));
 });

@@ -127,6 +127,43 @@ export function validateCulture(value:unknown):CultureContent {
   if(Buffer.byteLength(JSON.stringify(data),'utf8')>MAX_BYTES)throw Error('Превышен размер каталога');
   return data;
 }
+// Upgrade only the legacy Stage 05.4 template in memory. Keep original JSON intact
+// until an editor explicitly saves/publishes; all custom authored fields survive.
+export function enrichLegacySafety(content:CultureContent):CultureContent{
+  const copy=structuredClone(content);
+  const old=copy.safety.sections;
+  const legacy=old.some(s=>s.id==='objects'||s.id==='health');
+  if(legacy){
+    const current=new Map(old.map(x=>[x.id,x]));
+    copy.safety.sections=starterContent.safety.sections.map(section=>{
+      const found=current.get(section.id);
+      return found?found:structuredClone(section);
+    });
+    for(const [previous,target] of [['objects','terrorism'],['health','zozh']] as const){
+      const omitted=current.get(previous);
+      const destination=copy.safety.sections.find(s=>s.id===target);
+      if(omitted&&destination){
+        for(const paragraph of omitted.paragraphs){
+          if(destination.paragraphs.length<15&&!destination.paragraphs.includes(paragraph))
+            destination.paragraphs.push(paragraph);
+        }
+      }
+    }
+    if(copy.safety.title==='Безопасность начинается с внимания')copy.safety.title=starterContent.safety.title;
+    if(copy.safety.intro==='Собрали памятки, которые помогут чувствовать себя уверенно в ДК. Информация ознакомительная; приоритет всегда у объявлений и указаний сотрудников учреждения.')
+      copy.safety.intro=starterContent.safety.intro;
+    if(copy.safety.notice==='Это общие рекомендации для посетителей, а не утверждённая инструкция по эвакуации. Схемы выходов и локальные инструкции учреждения требуют отдельного согласования.')
+      copy.safety.notice=starterContent.safety.notice;
+  }
+  // The previous edition used a different ticket platform. Don't expose it in the kiosk.
+  if(copy.tickets.url==='https://gorodsobitiy.ru/venues/dk-kirovsky'){
+    copy.tickets=structuredClone(starterContent.tickets);
+  }
+  return copy;
+}
+function upgraded(state:CultureState):CultureState{
+  return {...state,draft:enrichLegacySafety(state.draft),published:enrichLegacySafety(state.published)};
+}
 export const defaultCultureState=():CultureState=>({
   revision:1,publishedRevision:1,draft:structuredClone(starterContent),
   published:structuredClone(starterContent),updatedAt:new Date(0).toISOString(),
@@ -145,7 +182,7 @@ export class FileCultureRepository implements CultureRepository{
   private async readStrict(){
     try{
       if((await stat(this.path)).size>MAX_BYTES*2+3000)throw Error('Каталог превышает допустимый размер');
-      const state=normalizeState(JSON.parse(await readFile(this.path,'utf8')));
+      const state=upgraded(normalizeState(JSON.parse(await readFile(this.path,'utf8'))));
       this.lastGood=structuredClone(state);return state;
     }catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return structuredClone(this.lastGood);throw e;}
   }
@@ -184,8 +221,8 @@ export class PgCultureRepository implements CultureRepository{
     );
   }
   private map(row:Record<string,unknown>):CultureState{
-    return normalizeState({revision:row.revision,publishedRevision:row.published_revision,
-      draft:row.draft,published:row.published,updatedAt:new Date(row.updated_at as Date|string).toISOString()});
+    return upgraded(normalizeState({revision:row.revision,publishedRevision:row.published_revision,
+      draft:row.draft,published:row.published,updatedAt:new Date(row.updated_at as Date|string).toISOString()}));
   }
   async get(){
     await this.ensure();

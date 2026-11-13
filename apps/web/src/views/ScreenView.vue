@@ -1,341 +1,294 @@
-<!-- apps/web/src/views/ScreenView.vue — themed touchscreen interface with live posters and searchable schedule. -->
+<!-- apps/web/src/views/ScreenView.vue — single-screen, touch-first public kiosk. -->
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
+import {computed,ref,onMounted,onBeforeUnmount,nextTick} from 'vue';
 import {useRoute} from 'vue-router';
 import EventCalendar from '../components/EventCalendar.vue';
 import DocumentLibrary from '../components/DocumentLibrary.vue';
 import CollectivesDirectory from '../components/CollectivesDirectory.vue';
 import CultureLanding from '../components/CultureLanding.vue';
+import GlobalSearch from '../components/GlobalSearch.vue';
+import TicketWidget from '../components/TicketWidget.vue';
+import MediaViewer from '../components/MediaViewer.vue';
+import type {KioskSearchResult} from '../utils/global-search.ts';
 import type {CultureContent} from '../utils/culture-types.js';
-import type {PublicEvent,PublicDocument as Document} from '../utils/content-types.js';
-import KioskKeyboard from '../components/KioskKeyboard.vue';
-import {filterSchedule} from '../utils/kiosk-search.js';
-import {visiblePosterWindow,shouldReturnHome} from '../utils/kiosk-behavior.js';
+import type {PublicEvent,PublicDocument} from '../utils/content-types.js';
+import {visiblePosterWindow,shouldReturnHome,posterSwipe} from '../utils/kiosk-behavior.js';
 
-const items = [
-  { id: 'posters', label: 'Афиша', icon: '✦' },
-  { id: 'schedule', label: 'Расписание', icon: '◷' },
-  { id: 'groups', label: 'Коллективы', icon: '◎' },
-  { id: 'calendar', label: 'Календарь событий', icon: '▦' },
-  { id: 'documents', label: 'Документы ДК', icon: '▤' },
-  { id: 'navigation', label: 'Навигация', icon: '⌖' },
-  { id: 'about', label: 'О ДК', icon: '▣' },
-  { id: 'safety', label: 'Безопасность', icon: '◇' },
-  { id: 'tickets', label: 'Билеты', icon: '◈' },
-  { id: 'contacts', label: 'Контакты', icon: '↗' },
+const MUZA_ORGANIZATION='https://muzaticket.ru/iframe/organizations/organization-mau-gdk-kirovskii-448753';
+const items=[
+  {id:'posters',label:'Афиша',icon:'✦'},
+  {id:'groups',label:'Коллективы',icon:'◎'},
+  {id:'calendar',label:'Календарь событий',icon:'▦'},
+  {id:'documents',label:'Документы ДК',icon:'▤'},
+  {id:'safety',label:'Безопасность',icon:'◇'},
+  {id:'about',label:'О ДК',icon:'▣'},
+  {id:'contacts',label:'Контакты',icon:'↗'},
+  {id:'navigation',label:'Навигация',icon:'⌖'},
 ] as const;
+type Section=(typeof items)[number]['id'];
 const route=useRoute();
-const initialSection=route.query.section;
-const current = ref<(typeof items)[number]['id']>(
-  items.some(item=>item.id===initialSection)?initialSection as (typeof items)[number]['id']:'posters');
-const events=ref<PublicEvent[]>([]);
-const documents=ref<Document[]>([]);
+const initial=route.query.section;
+const current=ref<Section>(items.some(x=>x.id===initial)?initial as Section:'posters');
+const scrollRegion=ref<HTMLElement|null>(null);
 const culture=ref<CultureContent|null>(null);
-const directoryRef=ref<{toggleSearch:()=>void}|null>(null);
-async function reloadCulture(){
-  try{const response=await fetch('/api/public/culture',{cache:'no-store'});
-    if(response.ok){const data:{content:CultureContent}=await response.json();culture.value=data.content;}
-  }catch{/* Last published content remains on screen during temporary connection errors. */}
-}
-const initialDocumentId=typeof route.query.document==='string'?route.query.document:'';
-async function reloadEvents(){
-  try{const r=await fetch('/api/public/events',{cache:'no-store'});
-    if(r.ok){const data:{events:PublicEvent[]}=await r.json();events.value=data.events;}
-  }catch{/* The last received published calendar remains visible while offline. */}
-}
-async function reloadDocuments(){
-  try{const r=await fetch('/api/public/documents',{cache:'no-store'});
-    if(r.ok){const data:{documents:Document[]}=await r.json();documents.value=data.documents;}
-  }catch{/* Do not hide already received documents on a transient network failure. */}
-}
-const welcome = ref<{ title:string; body:string } | null>(null);
+const events=ref<PublicEvent[]>([]);
+const documents=ref<PublicDocument[]>([]);
+type Poster={name:string;title:string;kind:'image'|'video';url:string;updatedAt:string};
+const posters=ref<Poster[]>([]);
+const posterIndex=ref(0),posterError=ref('');
+const activePoster=computed(()=>posters.value[posterIndex.value]??null);
+const posterDots=computed(()=>visiblePosterWindow(posters.value,posterIndex.value,7));
+const globalSearchOpen=ref(false),ticketOpen=ref(false),ticketUrl=ref(MUZA_ORGANIZATION);
+const activeVideo=ref<{url:string;title:string}|null>(null);
+const selectedGroupId=ref(''),groupMount=ref(0),selectedDocumentId=ref(
+  typeof route.query.document==='string'?route.query.document:'');
+const selectedEventDate=ref(''),pendingSafetyId=ref('');
 type VisitorTheme='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
-const visitorTheme=ref<VisitorTheme>('dk');
-const knownThemeIds=new Set(['dk','holiday','modern','aurora','poster','gallery','neon','kids']);
-async function reloadVisitorTheme(){
-  try{
-    const response=await fetch('/api/public/theme',{cache:'no-store'});
-    if(!response.ok)return;
-    const body:{theme:string}=await response.json();
-    if(knownThemeIds.has(body.theme))visitorTheme.value=body.theme as VisitorTheme;
-  }catch{/* Keep the last known theme while offline. */}
-}
-type Poster = {name:string; title:string; kind:'image'|'video'; url:string; updatedAt:string};
-const posters = ref<Poster[]>([]);
-const posterIndex = ref(0);
-const posterError = ref('');
-type ScheduleEntry = { id:string;label:string;group:string;leader:string;time:string;room:string;description:string;age:string;theme:'orange'|'blue'|'neutral' };
-type SchedulePayload = {entries:ScheduleEntry[];version:string;stale:boolean;message:string};
-const schedule = ref<ScheduleEntry[]>([]);
-const selectedScheduleId = ref<string|null>(null);
-const scheduleStatus = ref('');
-const searchQuery=ref('');
-const keyboardOpen=ref(false);
-const searchOpen=ref(false);
-const searchInput=ref<HTMLInputElement|null>(null);
-const filteredSchedule=computed(()=>filterSchedule(schedule.value,searchOpen.value?searchQuery.value:''));
-const selectedSchedule = computed(()=>schedule.value.find(x=>x.id===selectedScheduleId.value) ?? null);
-async function reloadSchedule(){
-  try {
-    const res=await fetch('/api/public/schedule',{cache:'no-store'});
-    if(!res.ok) throw new Error('Расписание временно недоступно');
-    const data:SchedulePayload=await res.json();
-    schedule.value=data.entries;
-    if(selectedScheduleId.value && !data.entries.some(x=>x.id===selectedScheduleId.value)) selectedScheduleId.value=null;
-    scheduleStatus.value=data.stale?'Данные временно не обновляются. Показана последняя корректная версия.':'';
-  } catch { scheduleStatus.value='Нет соединения. Показаны последние полученные данные.'; }
-}
-let reloadHandle: ReturnType<typeof setInterval> | undefined;
-let slideshowHandle: ReturnType<typeof setInterval> | undefined;
-let idleHandle: ReturnType<typeof setInterval> | undefined;
-let lastActivity=Date.now();
-let lastManualPosterInput=0;
-const IDLE_RETURN_MS=180000;
-function noteActivity(){lastActivity=Date.now();}
-function changeSection(section:(typeof items)[number]['id']){
-  noteActivity();
-  // Navigation changes the entire page; a previous visitor's query must not leak to another section.
+const visitorTheme=ref<VisitorTheme>('dk'),knownThemes=new Set(['dk','holiday','modern','aurora','poster','gallery','neon','kids']);
+let refreshTimer:ReturnType<typeof setInterval>|undefined;
+let slideTimer:ReturnType<typeof setInterval>|undefined;
+let inactivityTimer:ReturnType<typeof setInterval>|undefined;
+let lastActivity=Date.now(),lastManualPoster=0;
+const IDLE_MS=180000;
+let touchStart:{x:number;y:number;id:number}|null=null;
+function activity(){lastActivity=Date.now();}
+function go(section:Section){
+  activity();globalSearchOpen.value=false;
   if(section!==current.value){
     current.value=section;
-    selectedScheduleId.value=null;
-    searchOpen.value=false;
-    keyboardOpen.value=false;
-    searchQuery.value='';
-  }
+    selectedGroupId.value='';selectedDocumentId.value='';selectedEventDate.value='';pendingSafetyId.value='';
+  }else if(section==='groups')groupMount.value++;
+  if(section==='posters')posterIndex.value=Math.max(0,Math.min(posterIndex.value,posters.value.length-1));
+  if(scrollRegion.value)scrollRegion.value.scrollTop=0;
 }
-function focusSearchInput(){searchInput.value?.focus({preventScroll:true});}
-function focusSchedulePanel(){
-  if(selectedSchedule.value){
-    document.querySelector<HTMLElement>('.schedule-detail [data-schedule-title]')?.focus({preventScroll:true});
-  }else if(searchOpen.value){
-    focusSearchInput();
+function onEnter(){
+  scrollRegion.value?.scrollTo({top:0,behavior:'instant'});
+  if(pendingSafetyId.value){
+    const id=pendingSafetyId.value;pendingSafetyId.value='';
+    const section=document.getElementById('safety-'+id);
+    section?.scrollIntoView({behavior:'smooth',block:'start'});
   }else{
-    document.querySelector<HTMLElement>('.schedule-index-layout .schedule-button')?.focus({preventScroll:true});
+    document.querySelector<HTMLElement>('.screen-content [data-page-title]')?.focus({preventScroll:true});
   }
 }
-function focusCurrentPage(){
-  document.querySelector<HTMLElement>('.screen-content')?.scrollTo({top:0,behavior:'instant'});
-  if(searchOpen.value && (current.value==='schedule'||current.value==='groups')){
-    focusSearchInput();return;
+function openSearch(){activity();globalSearchOpen.value=true;}
+function closeSearch(){activity();globalSearchOpen.value=false;}
+function openTickets(url=MUZA_ORGANIZATION){activity();ticketUrl.value=url;ticketOpen.value=true;globalSearchOpen.value=false;}
+function closeTickets(){activity();ticketOpen.value=false;}
+function openVideo(url:string,title:string){activity();activeVideo.value={url,title};}
+function closeVideo(){activity();activeVideo.value=null;}
+function openResult(result:KioskSearchResult){
+  activity();globalSearchOpen.value=false;
+  if(result.section==='tickets'){openTickets();return;}
+  if(result.section==='groups'){
+    const from=current.value;current.value='groups';selectedGroupId.value=result.id;
+    if(from==='groups')groupMount.value++;
+  }else if(result.section==='documents'){
+    current.value='documents';selectedDocumentId.value=result.id;
+  }else if(result.section==='calendar'){
+    current.value='calendar';selectedEventDate.value=result.date??'';
+  }else if(result.section==='safety'){
+    const already=current.value==='safety';current.value='safety';pendingSafetyId.value=result.id;
+    if(already)void nextTick(()=>onEnter());
+  }else if(result.section==='posters'){
+    current.value='posters';
+    const index=posters.value.findIndex(x=>x.name===result.posterName);
+    if(index>=0)posterIndex.value=index;
+  }else if(result.section==='about'||result.section==='contacts'){
+    current.value=result.section;
   }
-  document.querySelector<HTMLElement>('.screen-content [data-page-title]')?.focus({preventScroll:true});
-}
-function toggleSearch(){
-  noteActivity();
-  if(current.value==='groups'){directoryRef.value?.toggleSearch();return;}
-  if(current.value!=='schedule'){
-    selectedScheduleId.value=null;
-    keyboardOpen.value=false;
-    searchQuery.value='';
-    searchOpen.value=true;
-    current.value='schedule';
-    return;
-  }
-  if(selectedScheduleId.value)selectedScheduleId.value=null;
-  searchOpen.value=!searchOpen.value;
-  if(!searchOpen.value){
-    searchQuery.value='';
-    keyboardOpen.value=false;
-  }
-}
-function openSchedule(id:string){noteActivity();keyboardOpen.value=false;selectedScheduleId.value=id;}
-function backToSchedule(){noteActivity();selectedScheduleId.value=null;}
-function resetIfIdle(){
-  if(!shouldReturnHome(lastActivity,Date.now(),IDLE_RETURN_MS))return;
-  if(current.value!=='posters'||selectedScheduleId.value||searchOpen.value||keyboardOpen.value||searchQuery.value){
-    current.value='posters';selectedScheduleId.value=null;searchOpen.value=false;keyboardOpen.value=false;searchQuery.value='';
-    posterIndex.value=0;
-  }
-}
-async function reloadPosters(){
-  try {
-    const response = await fetch('/api/public/posters', {cache:'no-store'});
-    if(!response.ok) throw new Error('Пока нет соединения с медиасервером');
-    const data:{posters:Poster[]} = await response.json();
-    const previous=posters.value[posterIndex.value]?.name;
-    posters.value=data.posters;
-    const index=posters.value.findIndex(item=>item.name===previous);
-    posterIndex.value=index>=0?index:0;
-    posterError.value='';
-  }catch { posterError.value='Афиши пока недоступны. Отображается последняя полученная подборка.'; }
 }
 function movePoster(direction:1|-1,manual=true){
-  if(manual){lastManualPosterInput=Date.now();noteActivity();}
-  if(posters.value.length)posterIndex.value=(posterIndex.value+posters.value.length+direction)%posters.value.length;
+  if(!posters.value.length)return;
+  if(manual){lastManualPoster=Date.now();activity();}
+  posterIndex.value=(posterIndex.value+posters.value.length+direction)%posters.value.length;
 }
-const activePoster=computed(()=>posters.value[posterIndex.value]);
-const posterThumbs=computed(()=>visiblePosterWindow(posters.value,posterIndex.value,6));
-function selectPoster(index:number){lastManualPosterInput=Date.now();noteActivity();posterIndex.value=index;}
-onMounted(async () => {
-  await Promise.all([reloadPosters(),reloadSchedule(),reloadVisitorTheme(),reloadEvents(),reloadDocuments(),reloadCulture()]);
-  reloadHandle=setInterval(()=>{void reloadPosters();void reloadSchedule();void reloadVisitorTheme();void reloadEvents();void reloadDocuments();void reloadCulture();},10000);
-  slideshowHandle=setInterval(()=>{if(activePoster.value?.kind!=='video' && Date.now()-lastManualPosterInput>=12000)movePoster(1,false);},8000);
-  idleHandle=setInterval(resetIfIdle,12000);
-  window.addEventListener('pointerdown',noteActivity,{passive:true});
-  window.addEventListener('keydown',noteActivity);
-  try { const response = await fetch('/api/public/pages/welcome', {cache:'no-store'});
-    if (response.ok) {const data:{page:{title:string;body:string}} = await response.json(); welcome.value=data.page;}
-  } catch { /* available only when API and DB are running */ }
+function selectPoster(index:number){activity();lastManualPoster=Date.now();posterIndex.value=index;}
+function posterTouchStart(event:PointerEvent){
+  if((event.target as HTMLElement).closest('button'))return;
+  if(event.pointerType!=='touch'&&event.pointerType!=='pen'&&event.pointerType!=='mouse')return;
+  touchStart={x:event.clientX,y:event.clientY,id:event.pointerId};activity();
+}
+function posterTouchEnd(event:PointerEvent){
+  const start=touchStart;touchStart=null;
+  if(!start||start.id!==event.pointerId||(event.target as HTMLElement).closest('button'))return;
+  const dx=event.clientX-start.x,dy=event.clientY-start.y;
+  const direction=posterSwipe(dx,dy);
+  if(direction)movePoster(direction);
+}
+function posterTouchCancel(){touchStart=null;}
+function resetIdle(){
+  if(ticketOpen.value||activeVideo.value)return; // avoid interrupting ticket/payment or embedded playback.
+  if(!shouldReturnHome(lastActivity,Date.now(),IDLE_MS))return;
+  globalSearchOpen.value=false;current.value='posters';posterIndex.value=0;
+  selectedGroupId.value='';selectedDocumentId.value='';selectedEventDate.value='';
+  pendingSafetyId.value='';scrollRegion.value?.scrollTo({top:0,behavior:'instant'});
+  lastActivity=Date.now();
+}
+async function reloadCulture(){
+  try{const r=await fetch('/api/public/culture',{cache:'no-store'});if(!r.ok)return;
+    const data:{content:CultureContent}=await r.json();culture.value=data.content;
+  }catch{/* Keep previous published version. */}
+}
+async function reloadEvents(){
+  try{const r=await fetch('/api/public/events',{cache:'no-store'});if(!r.ok)return;
+    const data:{events:PublicEvent[]}=await r.json();events.value=data.events;
+  }catch{/* Keep previous published version. */}
+}
+async function reloadDocuments(){
+  try{const r=await fetch('/api/public/documents',{cache:'no-store'});if(!r.ok)return;
+    const data:{documents:PublicDocument[]}=await r.json();documents.value=data.documents;
+  }catch{/* Keep previous published version. */}
+}
+async function reloadPosters(){
+  try{const r=await fetch('/api/public/posters',{cache:'no-store'});if(!r.ok)throw Error('Сервер афиш недоступен');
+    const data:{posters:Poster[]}=await r.json();const last=posters.value[posterIndex.value]?.name;
+    posters.value=data.posters;const index=data.posters.findIndex(item=>item.name===last);
+    posterIndex.value=index>=0?index:0;posterError.value='';
+  }catch{posterError.value='Сохранена предыдущая подборка афиш. Нет подключения к источнику.';}
+}
+async function reloadTheme(){
+  try{const r=await fetch('/api/public/theme',{cache:'no-store'});if(!r.ok)return;
+    const data:{theme:string}=await r.json();if(knownThemes.has(data.theme))visitorTheme.value=data.theme as VisitorTheme;
+  }catch{/* Keep last known color theme. */}
+}
+function browserKey(event:KeyboardEvent){
+  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='f'){
+    event.preventDefault();openSearch();
+  }
+  if(event.key==='Escape'&&!ticketOpen.value&&!activeVideo.value&&globalSearchOpen.value)closeSearch();
+}
+onMounted(async()=>{
+  await Promise.all([reloadCulture(),reloadEvents(),reloadDocuments(),reloadPosters(),reloadTheme()]);
+  refreshTimer=setInterval(()=>{void reloadCulture();void reloadEvents();void reloadDocuments();void reloadPosters();void reloadTheme();},10000);
+  slideTimer=setInterval(()=>{if(current.value==='posters'&&!ticketOpen.value&&activePoster.value?.kind!=='video'&&
+    Date.now()-lastManualPoster>12000)movePoster(1,false);},8000);
+  inactivityTimer=setInterval(resetIdle,12000);
+  window.addEventListener('pointerdown',activity,{passive:true});
+  window.addEventListener('keydown',activity);
+  window.addEventListener('keydown',browserKey,true);
 });
-const selected = computed(() => items.find((item) => item.id === current.value) ?? items[0]);
-onBeforeUnmount(()=>{if(reloadHandle)clearInterval(reloadHandle);if(slideshowHandle)clearInterval(slideshowHandle);
-  if(idleHandle)clearInterval(idleHandle);
-  window.removeEventListener('pointerdown',noteActivity);window.removeEventListener('keydown',noteActivity);
+onBeforeUnmount(()=>{
+  if(refreshTimer)clearInterval(refreshTimer);
+  if(slideTimer)clearInterval(slideTimer);
+  if(inactivityTimer)clearInterval(inactivityTimer);
+  window.removeEventListener('pointerdown',activity);
+  window.removeEventListener('keydown',activity);
+  window.removeEventListener('keydown',browserKey,true);
 });
 </script>
-
 <template>
-  <main class="shell screen-shell" :data-visitor-theme="visitorTheme">
-    <Transition name="kiosk-page" mode="out-in" @after-enter="focusCurrentPage">
-      <div :key="current" class="screen-content">
-      <header class="brand-row">
-        <div class="brand-glyph" aria-hidden="true">Н</div>
-        <div class="brand-copy"><strong>НАВИКУЛЬТУРА</strong><span>ЦИФРОВОЙ ИНФОЦЕНТР · ГДК «КИРОВСКИЙ»</span></div>
-        <button type="button" class="kiosk-search-trigger" :class="{active:searchOpen&&(current==='schedule'||current==='groups')}"
-          :aria-expanded="searchOpen&&(current==='schedule'||current==='groups')"
-          :aria-controls="searchOpen&&(current==='schedule'||current==='groups')?'kiosk-search-panel':undefined"
-          :aria-label="searchOpen&&(current==='schedule'||current==='groups')?'Закрыть поиск':'Открыть поиск по коллективам'"
-          title="Поиск" @click="toggleSearch">
-          <svg viewBox="0 0 24 24" aria-hidden="true" width="27" height="27" fill="none"
-            stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/>
-          </svg>
-        </button>
-        <span class="stage-note">ДК «КИРОВСКИЙ» · КРАСНОЯРСК</span>
-      </header>
-      <section v-if="current==='posters'" class="poster-gallery" aria-label="Актуальные афиши">
-        <div class="poster-heading"><span class="hero-overline">ПРОГРАММА МЕРОПРИЯТИЙ</span><h1 data-page-title tabindex="-1">Афиша<span class="dot">.</span></h1></div>
-        <div v-if="activePoster" class="poster-stage">
-          <Transition name="kiosk-poster">
-            <img v-if="activePoster.kind==='image'" :key="'image:'+activePoster.name"
-              class="poster-media" :src="activePoster.url" :alt="activePoster.title" />
-            <video v-else :key="'video:'+activePoster.name"
-              class="poster-media" :src="activePoster.url" autoplay muted playsinline controls
-              @ended="movePoster(1,false)"></video>
-          </Transition>
-          <div class="poster-caption"><strong>{{activePoster.title}}</strong><span>{{posterIndex+1}} / {{posters.length}}</span></div>
-          <div v-if="posters.length>1" class="poster-controls"><button type="button" aria-label="Предыдущая афиша" @click="movePoster(-1)">‹</button><button type="button" aria-label="Следующая афиша" @click="movePoster(1)">›</button></div>
-        </div>
-        <div v-if="posters.length>1" class="poster-filmstrip" aria-label="Выбор афиши">
-          <button v-for="item in posterThumbs" :key="item.poster.name" type="button" class="poster-thumbnail"
-            :class="{active:posterIndex===item.index}" :aria-current="posterIndex===item.index?'true':undefined"
-            :aria-label="'Афиша '+(item.index+1)+': '+item.poster.title" @click="selectPoster(item.index)">
-            <img v-if="item.poster.kind==='image'" :src="item.poster.url" alt="" loading="lazy" />
-            <span v-else class="poster-thumbnail-video">Видео</span>
-            <span class="poster-thumbnail-index">{{item.index+1}}</span>
+  <main class="shell screen-shell" :class="{'kiosk-home':current==='posters'}" :data-visitor-theme="visitorTheme">
+    <Transition name="kiosk-page" mode="out-in" @after-enter="onEnter">
+      <div :key="current" ref="scrollRegion" class="screen-content" :class="{'screen-poster-page':current==='posters'}">
+        <header class="brand-row">
+          <div class="brand-glyph" aria-hidden="true">Н</div>
+          <div class="brand-copy"><strong>НАВИКУЛЬТУРА</strong><span>ЦИФРОВОЙ ИНФОЦЕНТР · ГДК «КИРОВСКИЙ»</span></div>
+          <button type="button" class="kiosk-search-trigger" aria-label="Поиск по всей НавиКультуре"
+            title="Поиск" @click="openSearch">
+            <svg viewBox="0 0 24 24" aria-hidden="true" width="27" height="27" fill="none"
+              stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/>
+            </svg>
           </button>
-        </div>
-        <div v-if="!activePoster" class="poster-empty"><strong>Афиши появятся здесь автоматически</strong><p>Сотрудники могут добавить JPG, PNG или WebP через редактор или папку на сервере.</p></div>
-        <p v-if="posterError" class="poster-warning" role="status">{{posterError}}</p>
-      </section>
-      <section v-else-if="current==='schedule'" class="schedule-section" aria-live="polite">
-        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ИНФОРМАЦИЯ</span><h1 data-page-title tabindex="-1">Расписание<span class="dot">.</span></h1></div>
-        <Transition name="kiosk-detail" mode="out-in" @after-enter="focusSchedulePanel">
-          <div v-if="selectedSchedule" :key="'detail:'+selectedSchedule.id" class="schedule-detail-layout">
-          <button type="button" class="schedule-back" @click="backToSchedule">← Все направления</button>
-          <article class="schedule-detail">
-            <span class="eyebrow">КАРТОЧКА КОЛЛЕКТИВА</span>
-            <h2 data-schedule-title tabindex="-1">{{selectedSchedule.group}}</h2>
-            <div class="schedule-detail-rows">
-              <p v-if="selectedSchedule.leader"><b>Руководитель</b><span>{{selectedSchedule.leader}}</span></p>
-              <p v-if="selectedSchedule.time"><b>Занятия</b><span>{{selectedSchedule.time}}</span></p>
-              <p v-if="selectedSchedule.room"><b>Кабинет</b><span>{{selectedSchedule.room}}</span></p>
-              <p v-if="selectedSchedule.age"><b>Возраст</b><span>{{selectedSchedule.age}}</span></p>
-              <p v-if="selectedSchedule.description"><b>Описание</b><span>{{selectedSchedule.description}}</span></p>
+          <span class="stage-note">ДК «КИРОВСКИЙ» · КРАСНОЯРСК</span>
+        </header>
+        <section v-if="current==='posters'" class="poster-gallery kiosk-home-gallery" aria-label="Актуальные афиши">
+          <div class="poster-heading kiosk-home-heading"><span class="hero-overline">СКОРО НА СЦЕНЕ</span>
+            <h1 data-page-title tabindex="-1">Афиша<span class="dot">.</span></h1></div>
+          <div v-if="activePoster" class="poster-stage kiosk-home-stage"
+            aria-label="Пролистывайте афиши пальцем влево и вправо"
+            @pointerdown="posterTouchStart" @pointerup="posterTouchEnd" @pointercancel="posterTouchCancel">
+            <Transition name="kiosk-poster">
+              <img v-if="activePoster.kind==='image'" :key="'image:'+activePoster.name"
+                class="poster-media" :src="activePoster.url" :alt="'Афиша: '+activePoster.title" draggable="false" />
+              <video v-else :key="'video:'+activePoster.name"
+                class="poster-media" :src="activePoster.url" autoplay muted playsinline
+                controls @ended="movePoster(1,false)"></video>
+            </Transition>
+            <div v-if="posters.length>1" class="poster-controls kiosk-side-arrows">
+              <button type="button" aria-label="Предыдущая афиша" @click.stop="movePoster(-1)">‹</button>
+              <button type="button" aria-label="Следующая афиша" @click.stop="movePoster(1)">›</button>
             </div>
-          </article>
           </div>
-          <div v-else key="catalog" class="schedule-index-layout">
-          <Transition name="kiosk-search" @after-enter="focusSearchInput">
-          <div v-if="searchOpen" id="kiosk-search-panel" class="kiosk-search-panel" role="search" aria-label="Найти направление или коллектив">
-            <label for="schedule-search">Поиск по коллективам, руководителям и кабинетам</label>
-            <div class="kiosk-search-row">
-              <input id="schedule-search" ref="searchInput" v-model="searchQuery" type="search" maxlength="80"
-                autocomplete="off" spellcheck="false" placeholder="Например: Танцы, кабинет 210, руководитель"
-                @input="noteActivity" />
-              <button type="button" class="kiosk-search-keyboard-toggle" :aria-expanded="keyboardOpen" @click="keyboardOpen=!keyboardOpen">
-                {{keyboardOpen?'Скрыть клавиатуру':'⌨ Клавиатура'}}
-              </button>
-              <button v-if="searchQuery" type="button" class="kiosk-search-clear"
-                @click="searchQuery='';noteActivity()">Очистить</button>
+          <div v-else class="poster-empty kiosk-home-empty">
+            <strong>Афиши мероприятий</strong><p>Здесь будут показываться опубликованные изображения и видеоролики.</p>
+          </div>
+          <div class="kiosk-home-bottom">
+            <div class="kiosk-home-paging">
+              <span v-if="posters.length" class="poster-count">{{posterIndex+1}} / {{posters.length}}</span>
+              <div v-if="posters.length>1" class="kiosk-home-dots" aria-label="Выбор афиши">
+                <button v-for="item in posterDots" :key="item.poster.name" type="button"
+                  :class="{active:posterIndex===item.index}" :aria-current="posterIndex===item.index?'true':undefined"
+                  :aria-label="'Афиша '+(item.index+1)" @click="selectPoster(item.index)"></button>
+              </div>
             </div>
-            <KioskKeyboard v-if="keyboardOpen" v-model="searchQuery" @close="keyboardOpen=false"/>
-            <p v-if="schedule.length" class="kiosk-search-count" role="status">
-              {{searchQuery.trim()?'Найдено: '+filteredSchedule.length+' из '+schedule.length:'Направлений: '+schedule.length}}
-            </p>
+            <button type="button" class="kiosk-buy-tickets" @click="openTickets()">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 4h16v5a3 3 0 0 0 0 6v5H4v-5a3 3 0 0 0 0-6z"/>
+                <path d="M12 4v16" stroke-dasharray="2 3"/>
+              </svg>
+              Купить билет
+            </button>
           </div>
-          </Transition>
-          <template v-if="filteredSchedule.length">
-            <p class="schedule-hint">Выберите направление, чтобы посмотреть руководителя, дни занятий и кабинет.</p>
-            <TransitionGroup name="kiosk-card" tag="div" class="schedule-buttons">
-              <button v-for="entry in filteredSchedule" :key="entry.id" type="button" class="schedule-button"
-                @click="openSchedule(entry.id)">
-                <strong>{{entry.label}}</strong><span>{{entry.time||entry.group}}</span><span class="schedule-arrow">↗</span>
-              </button>
-            </TransitionGroup>
-          </template>
-          <div v-else-if="schedule.length" class="kiosk-search-empty" role="status">
-            <strong>Ничего не найдено</strong><span>Попробуйте другое название, фамилию руководителя или кабинет.</span>
-            <button type="button" class="schedule-back" @click="searchQuery='';keyboardOpen=false;noteActivity()">Показать все направления</button>
-          </div>
-          <div v-else class="poster-empty"><strong>Расписание появится автоматически</strong><p>Сотрудник создаст карточки через раздел «Расписание» в веб-редакторе. Опубликованные карточки появятся здесь автоматически.</p></div>
-          </div>
-        </Transition>
-        <p v-if="scheduleStatus" class="poster-warning" role="status">{{scheduleStatus}}</p>
-      </section>
-      <section v-else-if="current==='groups'" class="schedule-section culture-directory-page" aria-live="polite">
-        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ТВОРЧЕСКАЯ ЖИЗНЬ</span>
-          <h1 data-page-title tabindex="-1">Коллективы<span class="dot">.</span></h1></div>
-        <CollectivesDirectory v-if="culture" ref="directoryRef" :content="culture"/>
-      </section>
-      <section v-else-if="current==='safety'" class="culture-section" aria-live="polite">
-        <CultureLanding v-if="culture" :content="culture" mode="safety"/>
-      </section>
-      <section v-else-if="current==='tickets'" class="culture-section" aria-live="polite">
-        <CultureLanding v-if="culture" :content="culture" mode="tickets"/>
-      </section>
-      <section v-else-if="current==='about'" class="culture-section" aria-live="polite">
-        <CultureLanding v-if="culture" :content="culture" mode="about"/>
-      </section>
-      <section v-else-if="current==='contacts'" class="culture-section" aria-live="polite">
-        <CultureLanding v-if="culture" :content="culture" mode="contacts"/>
-      </section>
-      <section v-else-if="current==='calendar'" class="schedule-section visitor-calendar-page" aria-live="polite">
-        <div class="schedule-header"><span class="hero-overline">КУЛЬТУРНАЯ АФИША · ПО ДАТАМ</span>
-          <h1 data-page-title tabindex="-1">Календарь событий<span class="dot">.</span></h1></div>
-        <EventCalendar :events="events"/>
-      </section>
-      <section v-else-if="current==='documents'" class="schedule-section visitor-documents-page" aria-live="polite">
-        <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ОФИЦИАЛЬНАЯ ИНФОРМАЦИЯ</span>
-          <h1 data-page-title tabindex="-1">Документы<span class="dot">.</span></h1></div>
-        <DocumentLibrary :documents="documents" :initial-id="initialDocumentId"/>
-      </section>
-      <section v-else class="hero" aria-live="polite">
-        <div class="hero-overline"><i></i> ИНФОРМАЦИОННАЯ ПЛАТФОРМА</div>
-        <h1 data-page-title tabindex="-1">{{ selected.label }}<span class="dot">.</span></h1>
-        <p v-if="current === 'navigation'">Поиск помещений и интерактивная навигация по зданию.</p>
-        <p v-else-if="current === 'about'">{{ welcome?.body ?? 'Информация об учреждении и его деятельности.' }}</p>
-        <p v-else>Контакты и сведения для посетителей.</p>
-        <div class="feature-grid">
-          <div class="feature-primary"><span class="feature-index">01 / НАВИКУЛЬТУРА</span><b>ИНФОРМАЦИЯ<br/>БЕЗ ОЖИДАНИЯ</b><span>Автоматическое обновление материалов</span></div>
-          <div class="feature-secondary"><span class="feature-index">00 / СТАДИЯ РАЗРАБОТКИ</span><b>СКОРО</b><span>Демонстрационные данные, без реальных афиш</span></div>
-        </div>
-      </section>
-      <footer class="screen-footer"><span>НАВИГАЦИЯ · СОБЫТИЯ · ЛЮДИ</span><span>ДК «КИРОВСКИЙ»</span></footer>
+          <p v-if="posterError" class="kiosk-poster-status" role="status">{{posterError}}</p>
+        </section>
+        <section v-else-if="current==='groups'" class="schedule-section culture-directory-page" aria-label="Каталог коллективов">
+          <div class="schedule-header"><span class="hero-overline">ГДК «КИРОВСКИЙ» · ТВОРЧЕСКАЯ ЖИЗНЬ</span>
+            <h1 data-page-title tabindex="-1">Коллективы<span class="dot">.</span></h1></div>
+          <CollectivesDirectory v-if="culture" :key="groupMount" :content="culture" :initial-id="selectedGroupId"
+            @open-video="openVideo"/>
+        </section>
+        <section v-else-if="current==='calendar'" class="schedule-section visitor-calendar-page">
+          <div class="schedule-header"><span class="hero-overline">КУЛЬТУРНАЯ АФИША · ПО ДАТАМ</span>
+            <h1 data-page-title tabindex="-1">Календарь событий<span class="dot">.</span></h1></div>
+          <EventCalendar :events="events" :initial-date="selectedEventDate" @buy-ticket="openTickets"/>
+        </section>
+        <section v-else-if="current==='documents'" class="schedule-section visitor-documents-page">
+          <div class="schedule-header"><span class="hero-overline">ДК «КИРОВСКИЙ» · ОФИЦИАЛЬНАЯ ИНФОРМАЦИЯ</span>
+            <h1 data-page-title tabindex="-1">Документы<span class="dot">.</span></h1></div>
+          <DocumentLibrary :documents="documents" :initial-id="selectedDocumentId"/>
+        </section>
+        <section v-else-if="current==='safety'" class="culture-section" aria-label="Профилактика и безопасность">
+          <CultureLanding v-if="culture" :content="culture" mode="safety"/>
+        </section>
+        <section v-else-if="current==='about'" class="culture-section">
+          <CultureLanding v-if="culture" :content="culture" mode="about" @open-video="openVideo"/>
+        </section>
+        <section v-else-if="current==='contacts'" class="culture-section">
+          <CultureLanding v-if="culture" :content="culture" mode="contacts"/>
+        </section>
+        <section v-else class="hero">
+          <div class="hero-overline">ИНФОРМАЦИОННАЯ ПЛАТФОРМА</div>
+          <h1 data-page-title tabindex="-1">Навигация<span class="dot">.</span></h1>
+          <p>Интерактивная схема помещений Дворца культуры находится в разработке.</p>
+          <div class="feature-grid"><div class="feature-primary"><b>ПЛАН ДВОРЦА</b><span>Информация о помещениях</span></div>
+            <div class="feature-secondary"><b>СКОРО</b><span>Доступная навигация</span></div></div>
+        </section>
+        <footer v-if="current!=='posters'" class="screen-footer">
+          <span>НАВИГАЦИЯ · СОБЫТИЯ · ЛЮДИ</span><span>ГДК «КИРОВСКИЙ»</span>
+        </footer>
       </div>
     </Transition>
     <nav class="side-menu" aria-label="Разделы информационной системы">
-      <span class="menu-title">РАЗДЕЛЫ</span>
-      <button v-for="(item,index) in items" :key="item.id" type="button" class="nav-item" :class="{active:current===item.id}" :aria-current="current===item.id?'page':undefined" @click="changeSection(item.id)">
-        <span class="nav-index">{{ String(index+1).padStart(2,'0') }}</span><span class="nav-label">{{ item.label }}</span><span class="nav-glyph" aria-hidden="true">{{ item.icon }}</span>
+      <span class="menu-title">НАВИГАЦИЯ / РАЗДЕЛЫ</span>
+      <button v-for="(item,index) in items" :key="item.id" type="button" class="nav-item"
+        :class="{active:current===item.id}" :aria-current="current===item.id?'page':undefined" @click="go(item.id)">
+        <span class="nav-index">{{String(index+1).padStart(2,'0')}}</span>
+        <span class="nav-label">{{item.label}}</span><span class="nav-glyph">{{item.icon}}</span>
       </button>
-      <a class="kiosk-admin-shortcut" href="/editor" title="Открыть вход в административную панель" aria-label="Вход в административную панель">
-        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none"
+      <a href="/editor" class="kiosk-admin-shortcut" aria-label="Войти в кабинет администратора">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"
           stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
         </svg><span>Вход в админку</span>
       </a>
-      <div class="menu-bottom">NAVIKULTURA / 2026</div>
+      <div class="menu-bottom">НАВИКУЛЬТУРА / 2026</div>
     </nav>
+    <GlobalSearch v-if="globalSearchOpen" :data="{culture,events,documents,posters}"
+      @close="closeSearch" @open-result="openResult"/>
+    <TicketWidget v-if="ticketOpen" :url="ticketUrl" @close="closeTickets"/>
+    <MediaViewer v-if="activeVideo" :url="activeVideo.url" :title="activeVideo.title" @close="closeVideo"/>
   </main>
 </template>

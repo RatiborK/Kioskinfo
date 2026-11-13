@@ -2,7 +2,8 @@
 <script setup lang="ts">
 import {computed,ref,watch} from 'vue';
 import type {CultureContent,CultureCollective} from '../utils/culture-types.js';
-const props=defineProps<{content:CultureContent}>();
+const props=defineProps<{content:CultureContent;initialId?:string}>();
+const emit=defineEmits<{(e:'open-video',url:string,title:string):void}>();
 const category=ref('all'),query=ref(''),searchOpen=ref(false),selectedId=ref('');
 const categories=computed(()=>[{id:'all',title:'Все направления',symbol:'∞',description:'Весь каталог'},...props.content.categories]);
 const filtered=computed(()=>{
@@ -23,6 +24,9 @@ function choose(id:string){category.value=id;selectedId.value='';}
 function open(group:CultureCollective){selectedId.value=group.id;}
 function back(){selectedId.value='';}
 function toggleSearch(){searchOpen.value=!searchOpen.value;if(!searchOpen.value)query.value='';}
+watch(()=>props.initialId,id=>{if(id&&props.content.collectives.some(g=>g.id===id)){
+   selectedId.value=id;category.value='all';
+ }},{immediate:true});
 watch(()=>props.content.collectives,(rows)=>{
   if(selectedId.value&&!rows.find(row=>row.id===selectedId.value))selectedId.value='';
 });
@@ -92,9 +96,10 @@ defineExpose({toggleSearch});
             <span v-if="selected.age">{{selected.age}}</span>
             <span v-if="selected.room">{{selected.room}}</span>
           </div>
-          <a v-if="selected.videoUrl" :href="selected.videoUrl" target="_blank" rel="noopener noreferrer" class="culture-video-link">
+          <button v-if="selected.videoUrl" type="button" class="culture-video-link"
+            @click="emit('open-video',selected.videoUrl,selected.name)">
             <span aria-hidden="true">▶</span> Смотреть видео коллектива
-          </a>
+          </button>
           <span v-else class="culture-video-missing"><span aria-hidden="true">▶</span> Видео коллектива — скоро</span>
         </div>
       </div>

@@ -4,11 +4,11 @@ import {onMounted,ref,reactive} from 'vue';
 type Role='admin'|'editor'|'viewer';
 type Type='concert'|'play'|'festival'|'other';
 type Venue='hall'|'foyer'|'orfey';
-type Fields={title:string;date:string;time:string;type:Type;venue:Venue;description:string};
+type Fields={title:string;date:string;time:string;type:Type;venue:Venue;description:string;ticketUrl:string};
 type Item=Fields&{id:string;revision:number;published:Fields|null;updatedAt:string};
 const props=defineProps<{role:Role}>();
 const items=ref<Item[]>([]),selected=ref(''),revision=ref(0),status=ref('Загрузка…'),error=ref(''),busy=ref(false),dirty=ref(false);
-const form=reactive<Fields>({title:'',date:new Date().toLocaleDateString('sv-SE'),time:'',type:'concert',venue:'hall',description:''});
+const form=reactive<Fields>({title:'',date:new Date().toLocaleDateString('sv-SE'),time:'',type:'concert',venue:'hall',description:'',ticketUrl:''});
 const headers={'content-type':'application/json','x-navikultura-action':'1'};
 async function api<T>(path:string,init:RequestInit={}):Promise<T>{
   const r=await fetch(path,{...init,cache:'no-store',credentials:'same-origin'});
@@ -18,7 +18,7 @@ async function api<T>(path:string,init:RequestInit={}):Promise<T>{
 }
 function errorText(e:unknown){return e instanceof Error?e.message:String(e);}
 function use(item:Item){selected.value=item.id;revision.value=item.revision;
-  Object.assign(form,{title:item.title,date:item.date,time:item.time,type:item.type,venue:item.venue,description:item.description});
+  Object.assign(form,{title:item.title,date:item.date,time:item.time,type:item.type,venue:item.venue,description:item.description,ticketUrl:item.ticketUrl??''});
   dirty.value=false;status.value=item.published?'Опубликовано / при редактировании требуется повторная публикация':'Черновик';error.value='';
 }
 async function load(){
@@ -50,7 +50,7 @@ async function create(){
   busy.value=true;error.value='';
   try{
     const fields:Fields={title:'Новое мероприятие',date:new Date().toLocaleDateString('sv-SE'),
-      time:'',type:'concert',venue:'hall',description:''};
+      time:'',type:'concert',venue:'hall',description:'',ticketUrl:''};
     const r=await api<{item:Item}>('/api/editor/events',{method:'POST',headers,body:JSON.stringify({fields})});
     items.value.push(r.item);use(r.item);status.value='Черновик создан — заполните поля и опубликуйте';
   }catch(e){error.value=errorText(e);}finally{busy.value=false;}
@@ -103,6 +103,11 @@ onMounted(()=>{void load();});
         <label>Где проводится<select v-model="form.venue" :disabled="role==='viewer'" @change="changed" @blur="save">
           <option value="hall">★ Концертный зал</option><option value="foyer">● Танц-фойе</option>
           <option value="orfey">■ Театр «Орфей», 3-й этаж</option></select></label>
+        <label class="event-description">Ссылка на билет Muzaticket (необязательно)
+          <input v-model="form.ticketUrl" type="url" maxlength="600" placeholder="https://muzaticket.ru/iframe/..." 
+          :disabled="role==='viewer'" @input="changed" @blur="save"/>
+          <small>На карточке мероприятия появится кнопка «Купить билет». Окно покупки откроется внутри НавиКультуры.</small>
+        </label>
         <label class="event-description">Описание<textarea v-model="form.description" rows="5" maxlength="2000"
           :disabled="role==='viewer'" @input="changed" @blur="save"></textarea></label>
         <div class="editor-actions event-description">

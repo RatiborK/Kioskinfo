@@ -2,7 +2,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import ScheduleEditor from '../components/ScheduleEditor.vue';
 import VisitorThemeEditor from '../components/VisitorThemeEditor.vue';
 import EventEditor from '../components/EventEditor.vue';
 import DocumentEditor from '../components/DocumentEditor.vue';
@@ -11,23 +10,21 @@ type Role = 'admin' | 'editor' | 'viewer';
 type Account = {id:string; username:string; displayName:string; role:Role};
 type Page = {id:string;slug:string;title:string;body:string;revision:number;published_revision:number|null};
 type Poster = {name:string;title:string;kind:'image'|'video';url:string;sizeBytes:number;updatedAt:string};
-const scheduleEditor = ref<{flush:()=>Promise<boolean>}|null>(null);
 const eventEditor=ref<{flush:()=>Promise<boolean>}|null>(null);
 const cultureEditor=ref<{flush:()=>Promise<boolean>}|null>(null);
 const route=useRoute(),router=useRouter();
 const tabs=[
-  {id:'schedule',label:'Расписание',number:'01'},
-  {id:'posters',label:'Афиши',number:'02'},
-  {id:'pages',label:'Страницы',number:'03'},
-  {id:'themes',label:'Темы оформления',number:'04'},
-  {id:'calendar',label:'Календарь',number:'05'},
-  {id:'documents',label:'Документы',number:'06'},
-  {id:'culture',label:'Наполнение ДК',number:'07'},
+  {id:'posters',label:'Афиши',number:'01'},
+  {id:'culture',label:'Наполнение ДК',number:'02'},
+  {id:'calendar',label:'Календарь',number:'03'},
+  {id:'documents',label:'Документы',number:'04'},
+  {id:'pages',label:'Страницы',number:'05'},
+  {id:'themes',label:'Темы оформления',number:'06'},
 ] as const;
 type EditorTab=(typeof tabs)[number]['id'];
 const activeTab=computed<EditorTab>(()=>{
   const tab=route.query.tab;
-  return tabs.some(item=>item.id===tab)?tab as EditorTab:'schedule';
+  return tabs.some(item=>item.id===tab)?tab as EditorTab:'culture';
 });
 const posters = ref<Poster[]>([]);
 const uploading = ref(false);
@@ -108,7 +105,6 @@ async function login(){
 }
 async function logout(){
   if(!await flushPage())return;
-  if(scheduleEditor.value && !(await scheduleEditor.value.flush()))return;
   try{await api('/api/auth/logout',{method:'POST',headers,body:'{}'});}finally{user.value=null;pages.value=[];selectedId.value='';}
 }
 function changedField(){
@@ -160,7 +156,6 @@ async function changeTab(next:EditorTab):Promise<boolean>{
   if(next===activeTab.value)return true;
   if(busy.value||uploading.value)return false;
   if(activeTab.value==='pages'&&!await flushPage())return false;
-  if(activeTab.value==='schedule'&&scheduleEditor.value&&!await scheduleEditor.value.flush())return false;
   if(activeTab.value==='calendar'&&eventEditor.value&&!await eventEditor.value.flush())return false;
   if(activeTab.value==='culture'&&cultureEditor.value&&!await cultureEditor.value.flush())return false;
   await router.replace({path:route.path,query:{...route.query,tab:next}});
@@ -240,9 +235,6 @@ onBeforeUnmount(()=>{
           </div>
         </div>
       </section>
-      </div>
-      <div id="editor-panel-schedule" v-show="activeTab==='schedule'" class="editor-tab-content" role="tabpanel" aria-labelledby="editor-tab-schedule">
-        <ScheduleEditor ref="scheduleEditor" :role="user.role" />
       </div>
       <div id="editor-panel-pages" v-show="activeTab==='pages'" class="editor-tab-content editor-pages-layout" role="tabpanel" aria-labelledby="editor-tab-pages">
       <aside class="editor-page-list"><h2>Страницы</h2><button v-for="page in pages" :key="page.id" class="editor-page-link" :class="{'current':page.id===selectedId}" @click="selectPage(page)">{{page.title}}</button></aside>

@@ -2,7 +2,8 @@
 <script setup lang="ts">
 import {computed,ref,watch} from 'vue';
 import type {EventType,EventVenue,PublicEvent} from '../utils/content-types.js';
-const props=defineProps<{events:PublicEvent[]}>();
+const props=defineProps<{events:PublicEvent[];initialDate?:string}>();
+const emit=defineEmits<{(e:'buy-ticket',url:string):void}>();
 const today=new Date();
 const month=ref(new Date(today.getFullYear(),today.getMonth(),1));
 const chosen=ref(new Date(today.getFullYear(),today.getMonth(),today.getDate()).toLocaleDateString('sv-SE'));
@@ -30,6 +31,11 @@ const days=computed(()=>{
   });
 });
 const selectedEvents=computed(()=>grouped.value.get(chosen.value)??[]);
+watch(()=>props.initialDate,value=>{
+ if(value&&/^\d{4}-\d{2}-\d{2}$/.test(value)){
+  chosen.value=value;const d=new Date(value+'T12:00:00');month.value=new Date(d.getFullYear(),d.getMonth(),1);
+ }
+},{immediate:true});
 const selectedLabel=computed(()=>new Date(chosen.value+'T12:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long',year:'numeric'}));
 function move(delta:number){const next=new Date(month.value.getFullYear(),month.value.getMonth()+delta,1);month.value=next;chosen.value=key(next);}
 function select(id:string){chosen.value=id;const date=new Date(id+'T12:00:00');if(date.getMonth()!==month.value.getMonth()||date.getFullYear()!==month.value.getFullYear())month.value=new Date(date.getFullYear(),date.getMonth(),1);}
@@ -77,6 +83,12 @@ watch(()=>props.events,()=>{},{deep:false});
           <h4>{{event.title}}</h4>
           <p v-if="event.time">Начало: <strong>{{event.time}}</strong></p>
           <p v-if="event.description">{{event.description}}</p>
+          <button v-if="event.ticketUrl" type="button" class="calendar-ticket-button" @click="emit('buy-ticket',event.ticketUrl)">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16v5a3 3 0 0 0 0 6v5H4v-5a3 3 0 0 0 0-6z"/><path d="M12 4v16" stroke-dasharray="2 3"/>
+            </svg>
+            Купить билет
+          </button>
         </article>
       </div>
     </section>
