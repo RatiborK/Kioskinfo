@@ -1,4 +1,4 @@
-import {visibleFloorPlans} from './active-floor-plans.js';
+import {visibleFloorPlans} from './active-floor-plans.ts';
 // apps/web/src/utils/global-search.ts
 // Full-kiosk local search: only previously published data, never unapproved drafts.
 import {normalizeSearch,queryVariants} from './kiosk-search.ts';
