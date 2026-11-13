@@ -7,6 +7,7 @@ import DocumentLibrary from '../components/DocumentLibrary.vue';
 import CollectivesDirectory from '../components/CollectivesDirectory.vue';
 import CultureLanding from '../components/CultureLanding.vue';
 import NavigationPanel from '../components/NavigationPanel.vue';
+import KioskMenuIcon from '../components/KioskMenuIcon.vue';
 import GlobalSearch from '../components/GlobalSearch.vue';
 import TicketWidget from '../components/TicketWidget.vue';
 import MediaViewer from '../components/MediaViewer.vue';
@@ -284,7 +285,11 @@ onBeforeUnmount(()=>{
       <button v-for="(item,index) in items" :key="item.id" type="button" class="nav-item"
         :class="{active:current===item.id}" :aria-current="current===item.id?'page':undefined" @click="go(item.id)">
         <span class="nav-index">{{String(index+1).padStart(2,'0')}}</span>
-        <span class="nav-label">{{item.label}}</span><span class="nav-glyph">{{item.icon}}</span>
+        <span class="nav-label">{{item.label}}</span>
+        <span class="nav-glyph" :class="{'nav-glyph-original':item.id==='posters'||item.id==='calendar'}">
+          <template v-if="item.id==='posters'||item.id==='calendar'">{{item.icon}}</template>
+          <KioskMenuIcon v-else :name="item.id"/>
+        </span>
       </button>
       <a href="/editor" class="kiosk-admin-shortcut" aria-label="Войти в кабинет администратора">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"
