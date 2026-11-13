@@ -3,8 +3,8 @@
 import {normalizeSearch,queryVariants} from './kiosk-search.ts';
 import type {CultureContent} from './culture-types.js';
 import type {PublicEvent,PublicDocument} from './content-types.js';
-export type SearchTarget='groups'|'calendar'|'documents'|'safety'|'about'|'contacts'|'posters'|'tickets';
-export type KioskSearchResult={id:string;section:SearchTarget;kind:string;title:string;subtitle:string;date?:string;posterName?:string};
+export type SearchTarget='groups'|'calendar'|'documents'|'safety'|'about'|'contacts'|'posters'|'tickets'|'navigation';
+export type KioskSearchResult={id:string;section:SearchTarget;kind:string;title:string;subtitle:string;date?:string;posterName?:string;floorId?:string;pointId?:string};
 export type SearchPoster={name:string;title:string};
 export type SearchData={culture:CultureContent|null;events:readonly PublicEvent[];documents:readonly PublicDocument[];posters:readonly SearchPoster[]};
 const categoryLabel:Record<string,string>={prices:'Прейскуранты',policies:'Положения',benefits:'Льготы',other:'Документы'};
@@ -14,6 +14,16 @@ export function searchKiosk(data:SearchData,query:string,max=70):KioskSearchResu
   const push=(item:KioskSearchResult,haystack:string)=>rows.push({item,haystack:normalizeSearch(haystack)});
   const c=data.culture;
   if(c){
+    for(const floor of c.navigation.floors){
+      push({id:floor.id,section:'navigation',kind:'Навигация',title:floor.title,
+        subtitle:floor.note,floorId:floor.id},
+        [floor.title,floor.note,c.navigation.title,'навигация этаж план карта'].join(' '));
+      for(const point of floor.points){
+        push({id:point.id,section:'navigation',kind:floor.title,title:point.title,
+          subtitle:point.description,floorId:floor.id,pointId:point.id},
+          [floor.title,point.title,point.description,'кабинет зал помещение этаж'].join(' '));
+      }
+    }
     for(const group of c.collectives){
       const leaders=group.leaderIds.map(id=>c.leaders.find(p=>p.id===id)?.name??'').join(' ');
       const cat=c.categories.find(x=>x.id===group.category)?.title??'Коллективы';
