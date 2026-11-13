@@ -1,0 +1,26 @@
+# desktop/builder.yml — one portable Windows EXE, no installer or admin rights.
+appId: ru.kultura.navikultura
+productName: НавиКультура
+asar: true
+compression: maximum
+directories:
+  output: dist
+files:
+  - main.cjs
+  - preload.cjs
+  - first-run.html
+  - first-run.css
+  - first-run.js
+  - lib/**
+  - bundled/**
+  - package.json
+  - node_modules/**
+  - "!**/*.map"
+  - "!**/*.test.*"
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: "Navikultura-${version}-Windows-${arch}.${ext}"
+  signAndEditExecutable: false
