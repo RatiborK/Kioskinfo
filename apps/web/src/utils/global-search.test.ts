@@ -4,6 +4,11 @@ import {test} from 'node:test';
 import {searchKiosk} from './global-search.ts';
 import type {CultureContent} from './culture-types.js';
 const sample:CultureContent={
+ navigation:{title:'План ДК',intro:'',notice:'',floors:[
+  {id:'floor-1',title:'Первый этаж',note:'',points:[]},
+  {id:'floor-2',title:'Верхний уровень',note:'',points:[]},
+  {id:'floor-3',title:'Знаки',note:'',points:[]},
+ ]},
  about:{title:'Дворец культуры Кировский',intro:'История учреждения',facts:[],history:[],videoUrl:'',photo:'',photoCredit:'',sourceUrl:''},
  safety:{title:'Безопасность',intro:'',notice:'',sections:[
   {id:'bullying',title:'Профилактика буллинга',subtitle:'Безопасная среда',icon:'family',paragraphs:['Просите помощи у взрослых']}
