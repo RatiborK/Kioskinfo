@@ -9,6 +9,7 @@ import './visitor-themes.css';
 import './kiosk-motion.css';
 import './cultural-content.css';
 import './culture-pages.css';
+import './kiosk-touch.css';
 
 const router = createRouter({
   history: createWebHistory(),
