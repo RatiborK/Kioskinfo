@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import {computed,ref,watch} from 'vue';
 import type {CultureNavigation,CultureFloor,FloorPoint} from '../utils/culture-types.js';
-import {visibleFloorPlans} from '../utils/active-floor-plans.js';
+import {visibleFloorPlans} from '../utils/active-floor-plans.ts';
 const props=withDefaults(defineProps<{navigation:CultureNavigation;editable?:boolean;initialFloor?:string;initialPoint?:string}>(),{editable:false});
 const emit=defineEmits<{(e:'add-point',value:{floorId:string;x:number;y:number}):void;
   (e:'select-point',value:{floorId:string;id:string}):void}>();
