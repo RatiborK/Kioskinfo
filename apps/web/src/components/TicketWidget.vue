@@ -47,10 +47,19 @@ async function showWindowsKeyboard() {
       targetAddressSpace: 'loopback',
     };
     const response = await fetch(WINDOWS_KEYBOARD_BRIDGE, requestOptions);
-    if (!response.ok) throw new Error('Windows keyboard launch was rejected');
-    keyboardMessage.value = 'Клавиатура Windows вызвана. Коснитесь поля ввода в билетной форме.';
-  } catch {
-    keyboardMessage.value = 'Не удалось вызвать клавиатуру Windows на этом терминале.';
+    if (!response.ok) {
+      const data: { message?: string } = await response.json().catch(() => ({}));
+      const reason = data.message;
+      if (response.status === 403) throw new Error('Мост запущен, но адрес этого сайта не разрешён. Проверьте NAVIKULTURA_KIOSK_ORIGIN.');
+      if (reason === 'windows-only') throw new Error('Компонент должен работать на компьютере с Windows.');
+      if (reason === 'keyboard-launch-failed') throw new Error('Локальный компонент отвечает, но Windows не запустила osk.exe.');
+      throw new Error('Локальный компонент отклонил запрос (HTTP ' + response.status + ').');
+    }
+    keyboardMessage.value = 'Windows приняла запрос на запуск клавиатуры. Коснитесь поля в билетной форме.';
+  } catch (error) {
+    keyboardMessage.value = error instanceof Error && error.message !== 'Failed to fetch' && error.name !== 'AbortError'
+      ? error.message
+      : 'Нет соединения с локальным мостом или Edge запретил доступ к 127.0.0.1. Проверьте разрешение «Доступ к локальной сети» для адреса НавиКультуры.';
     keyboardHelp.value = true;
   } finally {
     window.clearTimeout(timeout);
@@ -90,7 +99,7 @@ onBeforeUnmount(() => {
         <p v-if="busy" class="kiosk-ticket-wait" role="status">Загружается билетная система…</p>
         <div v-if="keyboardHelp" class="kiosk-ticket-keyboard-help" role="alert">
           <strong>{{ keyboardMessage }}</strong>
-          <p>Нажмите на поле ввода Muzaticket: при включённом автоматическом показе Windows откроет сенсорную клавиатуру. Для работы кнопки «Клавиатура Windows» инженер должен запустить локальный компонент на этом компьютере. Браузер не может запускать приложения Windows самостоятельно.</p>
+          <p>Нажмите на поле ввода Muzaticket: при включённом автоматическом показе Windows откроет сенсорную клавиатуру. Для работы этой кнопки мост должен быть запущен в интерактивной Windows-сессии терминала. Убедитесь, что адрес открытого сайта разрешён в настройке NAVIKULTURA_KIOSK_ORIGIN; если Edge запросит «Доступ к локальной сети», разрешите его только для доверенного сайта. Браузер сам по себе не запускает приложения Windows.</p>
           <button type="button" @click="keyboardHelp=false">Закрыть</button>
         </div>
         <p v-else-if="keyboardMessage" class="kiosk-ticket-keyboard-result" role="status">{{ keyboardMessage }}</p>
