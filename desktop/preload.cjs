@@ -17,7 +17,7 @@ document.addEventListener('pointerdown', event => {
 }, { capture: true, passive: true });
 document.addEventListener('focusin', event => {
   const element = event.target;
-  if (!element || !(element instanceof HTMLElement)) return;
+  if (!element || !(element instanceof HTMLElement) || location.protocol==='file:') return;
   if (Date.now() - lastTouch > 2500 || Date.now() - lastKeyboard < 1600) return;
   const editable = element.matches('textarea,[contenteditable="true"]') ||
     (element.matches('input') && !['checkbox','radio','file','button','submit','color','range','hidden','date','time']
