@@ -52,12 +52,13 @@ const selectedFloorId=ref('floor-1'),selectedMapPoint=ref('');
 type VisitorTheme='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
 const visitorTheme=ref<VisitorTheme>('dk'),knownThemes=new Set(['dk','holiday','modern','aurora','poster','gallery','neon','kids']);
 const fullscreenEnabled=ref(false),fullscreenActive=ref(false);
+const nativeFullscreenShell=Boolean((window as Window & {navikulturaDesktop?:unknown}).navikulturaDesktop);
 const dkBackground=ref(DK_BACKGROUND),dkGlow=ref(DK_GLOW);
 const dkStyle=computed(()=>visitorTheme.value==='dk'?dkThemeVars(dkBackground.value,dkGlow.value):undefined);
 let fullscreenGestureFailed=false;
 function syncFullscreen(){fullscreenActive.value=!!document.fullscreenElement;}
 function fullscreenOnGesture(){
-  if(!fullscreenEnabled.value||document.fullscreenElement||fullscreenGestureFailed)return;
+  if(nativeFullscreenShell||!fullscreenEnabled.value||document.fullscreenElement||fullscreenGestureFailed)return;
   void document.documentElement.requestFullscreen().catch(()=>{fullscreenGestureFailed=true;});
 }
 async function fullscreenFromButton(){
@@ -189,7 +190,7 @@ async function reloadTheme(){
     fullscreenEnabled.value=data.fullscreenEnabled===true;
     // Managed Edge can allow an automatic Fullscreen API request for this origin.
     // Ordinary browsers will reject it; the explicit button/first user gesture remains.
-    if(fullscreenEnabled.value&&!previouslyEnabled&&!document.fullscreenElement)
+    if(!nativeFullscreenShell&&fullscreenEnabled.value&&!previouslyEnabled&&!document.fullscreenElement)
       void document.documentElement.requestFullscreen().catch(()=>{});
   }catch{/* Keep last known color theme. */}
 }
@@ -229,7 +230,7 @@ onBeforeUnmount(()=>{
       <div :key="current" ref="scrollRegion" class="screen-content" :class="{'screen-poster-page':current==='posters'}">
         <header class="brand-row">
           <DkLogo class="kiosk-dk-logo"/>
-          <button v-if="fullscreenEnabled&&!fullscreenActive" type="button"
+          <button v-if="fullscreenEnabled&&!fullscreenActive&&!nativeFullscreenShell" type="button"
             class="kiosk-fullscreen-trigger" @click="fullscreenFromButton"
             aria-label="Открыть экран посетителя на весь экран">На весь экран</button>
           <button type="button" class="kiosk-search-trigger" aria-label="Поиск по всей НавиКультуре"
