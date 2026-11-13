@@ -3,7 +3,7 @@
 import {computed,onMounted,ref} from 'vue';
 import NavigationPanel from './NavigationPanel.vue';
 import {isVisibleFloorPlan} from '../utils/active-floor-plans.js';
-import type {CultureContent,CultureCollective,CultureLeader,CultureState,FloorPoint} from '../utils/culture-types.js';
+import type {CultureContent,CultureCollective,CultureLeader,CultureState,FloorPoint,CultureFloor} from '../utils/culture-types.js';
 type Role='admin'|'editor'|'viewer';
 const props=defineProps<{role:Role}>();
 const state=ref<CultureState|null>(null),draft=ref<CultureContent|null>(null);
@@ -35,6 +35,14 @@ function removeNavPoint(){
  if(!draft.value||!navSelection.value||!canEdit.value)return;
  const floor=draft.value.navigation.floors.find(f=>f.id===navSelection.value?.floorId);
  if(!floor)return;floor.points=floor.points.filter(p=>p.id!==navSelection.value?.id);navSelection.value=null;touch();
+}
+function visibleFloorNote(floor:CultureFloor){
+  return floor.id==='floor-3'&&floor.note==='Дополнительные условные обозначения; этаж уточняется'
+    ?'Обозначения кабинетов и помещений добавим позже.'
+    :floor.note;
+}
+function updateFloorNote(floor:CultureFloor,event:Event){
+  floor.note=(event.target as HTMLTextAreaElement).value;touch();
 }
 const selectedCategoryTitle=computed(()=>draft.value?.categories.find(c=>c.id===group.value?.category)?.title??'');
 const headers={'Content-Type':'application/json','X-Navikultura-Action':'1'};
@@ -276,7 +284,7 @@ onMounted(()=>{void load();});
         <p>Сейчас доступны первый и второй этажи. Схема верхнего уровня сохранена в архивных данных, но скрыта. Третий этаж добавим отдельно.</p>
         <div v-for="floor in draft.navigation.floors.filter(f=>isVisibleFloorPlan(f.id))" :key="floor.id" class="culture-safety-edit-card">
           <strong>{{floor.id==='floor-3'?'Второй этаж':'Первый этаж'}}</strong>
-          <label>Примечание для посетителей<textarea v-model="floor.note" rows="2" maxlength="260" :disabled="!canEdit" @input="touch"/></label>
+          <label>Примечание для посетителей<textarea :value="visibleFloorNote(floor)" rows="2" maxlength="260" :disabled="!canEdit" @input="updateFloorNote(floor,$event)"/></label>
         </div>
         <div v-if="navPoint" class="culture-safety-edit-card">
           <h3>Выбранный объект</h3>
