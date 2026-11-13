@@ -46,9 +46,7 @@ watch(()=>props.documents,docs=>{
           <p>Просмотр PDF недоступен в этом браузере.</p>
         </object>
       </div>
-      <a class="document-download" :href="'/api/public/documents/'+selected.id+'/file'" target="_blank" rel="noopener">
-        Открыть оригинальный файл ({{selected.format.toUpperCase()}})
-      </a>
+      <p class="document-download-info">Документ открыт для ознакомления в НавиКультуре. Для получения оригинала обратитесь к сотрудникам ДК.</p>
     </div>
     <template v-else>
       <p class="documents-intro">Стоимость услуг, нормативные документы и информация о льготах — в одном месте.</p>
