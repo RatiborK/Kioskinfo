@@ -1,14 +1,40 @@
-/* apps/web/src/stage056.css — official DK site-inspired light theme and precise Visio floor navigation. */
-/* Only the public visitor theme changes; employee editor stays neutral. */
-.screen-shell[data-visitor-theme="dk"]{background:#fff;color:#152137}
+/* apps/web/src/stage056.css — DK branding, safe Visio navigation and ticket controls. */
+/* Stage 05.8: muted deep-slate DK shell. Keep the orange/blue brand inks unchanged. */
+.screen-shell[data-visitor-theme="dk"]{background:var(--v-bg);color:var(--v-text)}
 .screen-shell[data-visitor-theme="dk"] .screen-content{
-  background:#fbfcfd;background-image:linear-gradient(140deg,#f6f9fd 0 18%,#fff 19% 90%,#f4f8fc);
+  background-color:var(--v-bg);
+  background-image:repeating-linear-gradient(90deg,transparent 0 83px,#91c5d411 83px 84px),
+    linear-gradient(155deg,#354e6055,transparent 48%,#1e334344);
+  isolation:isolate;
+}
+.screen-shell[data-visitor-theme="dk"] .screen-content::after{
+  content:"";position:absolute;top:-23%;left:-31%;width:70%;height:75%;
+  background:radial-gradient(ellipse at center,#4ca1af70 0%,#4ca1af2c 36%,transparent 74%);
+  filter:blur(28px);pointer-events:none;z-index:-1;
+  animation:dk-ambient-glow 46s ease-in-out infinite alternate;
+  will-change:transform;
+}
+.visitor-theme-preview[data-visitor-theme="dk"]{position:relative;isolation:isolate}
+.visitor-theme-preview[data-visitor-theme="dk"]::after{
+  content:"";position:absolute;top:-30%;left:-45%;width:95%;height:90%;
+  background:radial-gradient(ellipse at center,#4ca1af70,#4ca1af24 42%,transparent 74%);
+  filter:blur(14px);pointer-events:none;z-index:-1;
+  animation:dk-ambient-glow 46s ease-in-out infinite alternate;
+}
+@keyframes dk-ambient-glow{
+  from{transform:translate3d(0,0,0)}
+  to{transform:translate3d(94%,5%,0)}
+}
+@media(prefers-reduced-motion:reduce){
+  .screen-shell[data-visitor-theme="dk"] .screen-content::after,
+  .visitor-theme-preview[data-visitor-theme="dk"]::after{animation:none;will-change:auto}
 }
 .screen-shell[data-visitor-theme="dk"] .side-menu{
-  background:#fff;box-shadow:-12px 0 32px #1332560b;border-left:1px solid #e6ebf1;
+  background:var(--v-nav);box-shadow:-12px 0 32px #11263533;border-left:1px solid var(--v-line);
 }
 .screen-shell[data-visitor-theme="dk"] .brand-row{
-  border-bottom:1px solid #dfe7ee;background:linear-gradient(95deg,#fff,#f4f9fd);
+  border-bottom:1px solid var(--v-line);
+  background:linear-gradient(95deg,#2c3e5099,#344e6088);
   padding-bottom:12px;margin-bottom:12px;
 }
 .screen-shell[data-visitor-theme="dk"] .brand-glyph{
@@ -17,14 +43,14 @@
   font-size:33px;font-weight:950;transform:none;
 }
 .screen-shell[data-visitor-theme="dk"] .brand-copy strong{
-  font-weight:950;letter-spacing:-.035em;color:#172131;
+  font-weight:950;letter-spacing:-.035em;color:var(--v-text);
 }
-.screen-shell[data-visitor-theme="dk"] .brand-copy span{color:#647182}
+.screen-shell[data-visitor-theme="dk"] .brand-copy span{color:var(--v-muted)}
 .screen-shell[data-visitor-theme="dk"] .nav-item.active{
-  background:#fff6ef;border-left:4px solid #ff6a00;
-  box-shadow:inset 0 0 0 1px #ffe2ca;color:#df5b00;
+  background:#3b4f62;border-left:4px solid #ff6a00;
+  box-shadow:inset 0 0 0 1px #f98f4b55;color:#ffad6d;
 }
-.screen-shell[data-visitor-theme="dk"] .nav-item:hover{background:#f3f7fb;color:#0b59a4}
+.screen-shell[data-visitor-theme="dk"] .nav-item:hover{background:#385367;color:var(--v-text)}
 .screen-shell[data-visitor-theme="dk"] .nav-item .nav-glyph{color:#065cbd}
 .screen-shell[data-visitor-theme="dk"] .kiosk-buy-tickets,
 .screen-shell[data-visitor-theme="dk"] .calendar-ticket-button{color:#fff;background:#ff6a00;border-color:#ff6a00}
@@ -156,6 +182,14 @@
 .kiosk-ticket-keyboard-help strong{font-size:16px}
 .kiosk-ticket-keyboard-help p{flex:1;line-height:1.5;font-size:14px;margin:0;min-width:200px}
 .kiosk-ticket-keyboard-help button{background:#0863b2;border:0;color:white;padding:12px 18px;border-radius:9px}
+.kiosk-ticket-keyboard:disabled{opacity:.65;cursor:progress}
+.kiosk-ticket-keyboard-result{
+  position:absolute;right:18px;bottom:14px;z-index:3;max-width:min(650px,90%);
+  padding:9px 14px;margin:0;border:1px solid #b7d8dd;border-radius:9px;
+  background:#edf8f9;color:#184a54;font-size:13px;line-height:1.4;
+  pointer-events:none;box-shadow:0 4px 22px #0d1a3129
+}
+
 @media(max-width:1060px){
  .floor-navigation-layout,.culture-editor .floor-navigation-layout{grid-template-columns:1fr}
  .floor-navigation-viewport{max-height:690px}
@@ -329,4 +363,14 @@
   .screen-shell .kiosk-dk-logo .dk-brand-name{font-size:18px}
   .screen-shell .kiosk-dk-logo .dk-brand-subline{font-size:6px}
   .screen-shell .kiosk-dk-logo .dk-brand-city{font-size:6px}
+}
+
+/* Keep the approved blue/orange SVG inks; a fine cool halo lifts blue strokes
+   against the new slate background without adding icon frames. */
+.screen-shell[data-visitor-theme="dk"] .nav-glyph .kiosk-menu-svg,
+.visitor-theme-preview[data-visitor-theme="dk"] .kiosk-menu-svg{
+  filter:drop-shadow(0 0 1px #edf8ffc0) drop-shadow(0 0 3px #93ccff4d);
+}
+.screen-shell[data-visitor-theme="dk"] :is(button,a,input):focus-visible{
+  outline-color:#98d9ea;
 }
