@@ -10,7 +10,7 @@ import { FileThemeRepository } from './themes.js';
 import { FileEventsRepository } from './events.js';
 import { FolderDocumentsRepository } from './documents.js';
 import {FileCultureRepository,CultureMedia} from './culture.js';
-import { hashPassword } from './crypto.js';
+import { hashLocalPreviewPassword } from './crypto.js';
 import type { Account, Page, PublicContent, Session, Store } from './model.js';
 
 class LocalDevStore implements Store {
@@ -42,7 +42,7 @@ const password=configuredPassword || randomBytes(18).toString('base64url');
 if(password.length<8)throw new Error('NAVIKULTURA_DEV_PASSWORD: минимум 8 символов только для локального просмотра');
 if(configuredPassword&&password.length<12)
   process.stderr.write('[NAVIKULTURA DEV] Короткий пароль разрешён только на 127.0.0.1. Для эксплуатации требуется другой, более сильный пароль.\n');
-const store=new LocalDevStore(await hashPassword(password));
+const store=new LocalDevStore(await hashLocalPreviewPassword(password));
 const scheduleRepo=new FileScheduleRepository();
 let importedCards=0;
 try{importedCards=await seedPreviewSchedule(scheduleRepo);}
