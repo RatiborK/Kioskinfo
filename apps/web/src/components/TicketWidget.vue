@@ -34,21 +34,24 @@ async function showWindowsKeyboard() {
   try {
     // No code runs on the central server. This endpoint must be provided by the
     // loopback-only helper running in the Windows session of the kiosk itself.
-    const response = await fetch(WINDOWS_KEYBOARD_BRIDGE, {
+    // Newer Edge/Chromium may require a loopback-network site permission.
+    // targetAddressSpace also marks this HTTP loopback fetch as an intentional
+    // local-device request from an HTTPS page.
+    const requestOptions: RequestInit & { targetAddressSpace: 'loopback' } = {
       method: 'POST',
       mode: 'cors',
       credentials: 'omit',
       cache: 'no-store',
       headers: { 'X-Navikultura-Keyboard': 'show' },
       signal: controller.signal,
-    });
+      targetAddressSpace: 'loopback',
+    };
+    const response = await fetch(WINDOWS_KEYBOARD_BRIDGE, requestOptions);
     if (!response.ok) throw new Error('Windows keyboard launch was rejected');
     keyboardMessage.value = 'Клавиатура Windows вызвана. Коснитесь поля ввода в билетной форме.';
   } catch {
-    if (!controller.signal.aborted || keyboardStarting.value) {
-      keyboardMessage.value = 'Не удалось вызвать клавиатуру Windows на этом терминале.';
-      keyboardHelp.value = true;
-    }
+    keyboardMessage.value = 'Не удалось вызвать клавиатуру Windows на этом терминале.';
+    keyboardHelp.value = true;
   } finally {
     window.clearTimeout(timeout);
     if (keyboardAbort === controller) keyboardAbort = null;
