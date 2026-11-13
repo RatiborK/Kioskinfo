@@ -46,7 +46,14 @@ test('approved SVG mark is the single source for visitor, editor and browser bra
   const index=await read('../../index.html');
   assert.match(component,/КИРОВСКИЙ/);
   assert.match(component,/ДВОРЕЦ КУЛЬТУРЫ/);
-  assert.match(component,/src="\/brand\/dk-kirovsky-symbol\.svg"/);
+  // In-app mark must match the approved source geometry exactly, but dark ink is
+  // rendered inline so the logo works on light/dark backgrounds without a plaque.
+  const coordinates=(svg:string)=>Array.from(svg.matchAll(/<polygon points="([^"]+)"/g),match=>match[1]);
+  assert.deepEqual(coordinates(component),coordinates(source));
+  assert.equal((component.match(/fill="currentColor"/g)??[]).length,3);
+  assert.match(component,/fill="#FF7900"/);
+  assert.match(component,/fill="#0874FF"/);
+  assert.doesNotMatch(component,/<img /);
   assert.equal((source.match(/<polygon /g)??[]).length,5);
   assert.match(source,/viewBox="128 90 990 1100"/);
   for(const color of ['#080808','#FF7900','#0874FF'])assert.ok(source.includes(color));
@@ -54,6 +61,11 @@ test('approved SVG mark is the single source for visitor, editor and browser bra
   assert.match(editor,/<DkLogo class="editor-brand-logo"\s*\/>/);
   assert.match(index,/href="\/brand\/dk-kirovsky-symbol\.svg"/);
   assert.doesNotMatch(screen,/class="brand-glyph"/);
+  const themeCss=await read('../stage056.css');
+  assert.match(themeCss,/background:transparent!important/);
+  assert.match(themeCss,/\.screen-shell \.(?:nav-glyph|nav-item).*kiosk-menu-svg/);
+  assert.match(themeCss,/filter:none!important/);
+  assert.match(themeCss,/\.screen-shell\[data-visitor-theme="dk"\]::before/);
 });
 
 test('menu icon surfaces are frameless and themed, while theme previews show actual icons',async()=>{
