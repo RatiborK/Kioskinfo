@@ -269,3 +269,64 @@
 @media(prefers-reduced-motion:reduce){
   .screen-shell .nav-glyph{transition:none}
 }
+
+/* 05.7.1 — brand lockup uses the exact approved SVG mark (not a re-drawn K).
+   CSS handles only the wordmark, while the mark itself is a reusable source file. */
+.dk-brand-lockup{
+  display:inline-flex!important;align-items:center;justify-content:flex-start;
+  gap:clamp(6px,.65vw,10px);vertical-align:middle;
+  background:#fff;color:#0c0c0e;
+}
+.dk-brand-lockup .dk-brand-mark{
+  display:block;width:clamp(46px,5.4vw,63px);height:57px;
+  max-width:27%;flex:0 0 auto;object-fit:contain;object-position:center;
+}
+.dk-brand-lockup .dk-brand-wordmark{
+  display:flex;flex:1 1 auto;flex-direction:column;align-items:flex-start;
+  min-width:0;white-space:nowrap;line-height:1;color:#0c0c0e;
+}
+.dk-brand-lockup .dk-brand-name{
+  display:block;font-family:"Arial Narrow","Roboto Condensed",Impact,"Segoe UI",sans-serif;
+  font-stretch:condensed;font-size:clamp(17px,1.65vw,25px);
+  font-weight:950;letter-spacing:-.06em;line-height:.98;color:#0c0c0e;
+}
+.dk-brand-lockup .dk-brand-subline{
+  display:block;margin-top:4px;font-family:"Arial Narrow","Segoe UI",sans-serif;
+  font-size:clamp(6px,.74vw,9px);font-weight:900;letter-spacing:.11em;
+  line-height:1;color:#0c0c0e;
+}
+.dk-brand-lockup .dk-brand-city{
+  display:block;margin-top:5px;font-family:"Arial Narrow","Segoe UI",sans-serif;
+  font-size:clamp(6px,.65vw,8px);font-weight:750;letter-spacing:.05em;
+  color:#252525;
+}
+.screen-shell .kiosk-dk-logo.dk-brand-lockup{
+  display:inline-flex!important;align-self:center;max-height:64px;height:64px;
+  box-sizing:border-box;overflow:hidden;
+}
+.screen-shell.kiosk-home .kiosk-dk-logo.dk-brand-lockup{display:inline-flex!important;max-height:61px;height:61px}
+.editor-brand-logo.dk-brand-lockup{
+  display:inline-flex!important;height:64px;max-height:64px;
+  box-sizing:border-box;overflow:hidden;
+}
+.visitor-theme-preview .theme-mini-dk-logo.dk-brand-lockup{
+  display:inline-flex!important;min-width:0;min-height:31px;height:auto;
+  padding:3px 4px;gap:4px;
+}
+.visitor-theme-preview .theme-mini-dk-logo .dk-brand-mark{
+  width:clamp(22px,2.7vw,32px);height:31px;max-width:30%;
+}
+.visitor-theme-preview .theme-mini-dk-logo .dk-brand-name{font-size:clamp(8px,1.1vw,13px)}
+.visitor-theme-preview .theme-mini-dk-logo .dk-brand-subline{font-size:5px;letter-spacing:0}
+.visitor-theme-preview .theme-mini-dk-logo .dk-brand-city{font-size:5px;margin-top:2px}
+.visitor-theme-large .theme-mini-dk-logo.dk-brand-lockup{gap:10px;min-height:63px}
+.visitor-theme-large .theme-mini-dk-logo .dk-brand-mark{width:62px;height:63px}
+.visitor-theme-large .theme-mini-dk-logo .dk-brand-name{font-size:25px}
+.visitor-theme-large .theme-mini-dk-logo .dk-brand-subline{font-size:9px;letter-spacing:.1em}
+.visitor-theme-large .theme-mini-dk-logo .dk-brand-city{font-size:8px}
+@media(max-width:650px){
+  .screen-shell .kiosk-dk-logo .dk-brand-mark{width:43px;height:48px}
+  .screen-shell .kiosk-dk-logo .dk-brand-name{font-size:18px}
+  .screen-shell .kiosk-dk-logo .dk-brand-subline{font-size:6px}
+  .screen-shell .kiosk-dk-logo .dk-brand-city{font-size:6px}
+}
