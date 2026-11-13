@@ -7,7 +7,7 @@ import { validateScheduleFields, type ScheduleRepository } from './schedule.js';
 import {validateEvent,type EventsRepository} from './events.js';
 import {documentStream,type DocumentRepository} from './documents.js';
 import { defaultThemeSettings,isThemeId,THEME_NAMES, VISITOR_THEME_IDS,type ThemeRepository } from './themes.js';
-import {CultureMedia,defaultCultureState,validateCulture,type CultureRepository} from './culture.js';
+import {CultureMedia,defaultCultureState,validateCulture,restoreMissingStarterContent,type CultureRepository} from './culture.js';
 import {cultureWithOptionalSchedule} from './culture-availability.js';
 
 export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; events?: EventsRepository; documents?: DocumentRepository; culture?: CultureRepository; cultureMedia?: CultureMedia; cookieSecure?: boolean; allowedOrigin?: string }
@@ -91,6 +91,20 @@ export function createApp(options: AppOptions) {
     if(!state)return reply.code(409).send({error:'Контент изменён другим сотрудником. Обновите данные'});
     await store.audit(user.id,'culture.save',{revision:state.revision});
     return {state};
+  });
+  app.post<{Body:{expectedRevision?:number}}>('/api/editor/culture/restore-starter',async(request,reply)=>{
+    const user=await requireRole(request,reply,['admin']);if(!user)return;
+    if(!culture)return reply.code(503).send({error:'Каталог ДК недоступен'});
+    const expected=Number(request.body?.expectedRevision);
+    if(!Number.isSafeInteger(expected)||expected<1)return reply.code(400).send({error:'Неверная версия'});
+    const current=await culture.get();
+    if(expected!==current.revision)return reply.code(409).send({error:'Каталог изменился, обновите страницу'});
+    const {content,added}=restoreMissingStarterContent(current.draft);
+    if(!Object.values(added).some(Boolean))return {state:current,added};
+    const saved=await culture.update(content,expected);
+    if(!saved)return reply.code(409).send({error:'Каталог изменился, обновите страницу'});
+    await store.audit(user.id,'culture.restore-starter',{added});
+    return {state:saved,added};
   });
   app.post<{Body:{expectedRevision?:number}}>('/api/editor/culture/publish',async(request,reply)=>{
     const user=await requireRole(request,reply,['admin']);if(!user)return;
