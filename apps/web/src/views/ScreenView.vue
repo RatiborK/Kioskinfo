@@ -8,6 +8,7 @@ import CollectivesDirectory from '../components/CollectivesDirectory.vue';
 import CultureLanding from '../components/CultureLanding.vue';
 import NavigationPanel from '../components/NavigationPanel.vue';
 import KioskMenuIcon from '../components/KioskMenuIcon.vue';
+import DkLogo from '../components/DkLogo.vue';
 import GlobalSearch from '../components/GlobalSearch.vue';
 import TicketWidget from '../components/TicketWidget.vue';
 import MediaViewer from '../components/MediaViewer.vue';
@@ -18,14 +19,14 @@ import {visiblePosterWindow,shouldReturnHome,posterSwipe} from '../utils/kiosk-b
 
 const MUZA_ORGANIZATION='https://muzaticket.ru/iframe/organizations/organization-mau-gdk-kirovskii-448753';
 const items=[
-  {id:'posters',label:'Афиша',icon:'✦'},
-  {id:'groups',label:'Коллективы',icon:'◎'},
-  {id:'calendar',label:'Календарь событий',icon:'▦'},
-  {id:'documents',label:'Документы ДК',icon:'▤'},
-  {id:'safety',label:'Безопасность',icon:'◇'},
-  {id:'about',label:'О ДК',icon:'▣'},
-  {id:'contacts',label:'Контакты',icon:'↗'},
-  {id:'navigation',label:'Навигация',icon:'⌖'},
+  {id:'posters',label:'Афиша'},
+  {id:'groups',label:'Коллективы'},
+  {id:'calendar',label:'Календарь событий'},
+  {id:'documents',label:'Документы ДК'},
+  {id:'safety',label:'Безопасность'},
+  {id:'about',label:'О ДК'},
+  {id:'contacts',label:'Контакты'},
+  {id:'navigation',label:'Навигация'},
 ] as const;
 type Section=(typeof items)[number]['id'];
 const route=useRoute();
@@ -199,8 +200,7 @@ onBeforeUnmount(()=>{
     <Transition name="kiosk-page" mode="out-in" @after-enter="onEnter">
       <div :key="current" ref="scrollRegion" class="screen-content" :class="{'screen-poster-page':current==='posters'}">
         <header class="brand-row">
-          <div class="brand-glyph" aria-hidden="true">Н</div>
-          <div class="brand-copy"><strong>НАВИКУЛЬТУРА</strong><span>ЦИФРОВОЙ ИНФОЦЕНТР · ГДК «КИРОВСКИЙ»</span></div>
+          <DkLogo class="kiosk-dk-logo"/>
           <button type="button" class="kiosk-search-trigger" aria-label="Поиск по всей НавиКультуре"
             title="Поиск" @click="openSearch">
             <svg viewBox="0 0 24 24" aria-hidden="true" width="27" height="27" fill="none"
@@ -214,7 +214,6 @@ onBeforeUnmount(()=>{
               <path d="M5 9h1m3 0h1m3 0h1m3 0h1M5 12h1m3 0h1m3 0h1m3 0h1M7 16h10" stroke-linecap="round"/>
             </svg>
           </button>
-          <span class="stage-note">ДК «КИРОВСКИЙ» · КРАСНОЯРСК</span>
         </header>
         <div v-if="cultureError" class="kiosk-culture-warning" role="status">
           <span>{{cultureError}}</span>
@@ -301,10 +300,7 @@ onBeforeUnmount(()=>{
         :class="{active:current===item.id}" :aria-current="current===item.id?'page':undefined" @click="go(item.id)">
         <span class="nav-index">{{String(index+1).padStart(2,'0')}}</span>
         <span class="nav-label">{{item.label}}</span>
-        <span class="nav-glyph" :class="{'nav-glyph-original':item.id==='posters'||item.id==='calendar'}">
-          <template v-if="item.id==='posters'||item.id==='calendar'">{{item.icon}}</template>
-          <KioskMenuIcon v-else :name="item.id"/>
-        </span>
+        <span class="nav-glyph"><KioskMenuIcon :name="item.id"/></span>
       </button>
       <a href="/editor" class="kiosk-admin-shortcut" aria-label="Войти в кабинет администратора">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"
@@ -312,7 +308,7 @@ onBeforeUnmount(()=>{
           <rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>
         </svg><span>Вход в админку</span>
       </a>
-      <div class="menu-bottom">НАВИКУЛЬТУРА / 2026</div>
+      <div class="menu-bottom">ГДК «КИРОВСКИЙ» / НАВИКУЛЬТУРА</div>
     </nav>
     <GlobalSearch v-if="globalSearchOpen" :data="{culture,events,documents,posters}"
       :initial-keyboard="searchKeyboardRequested"

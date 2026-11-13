@@ -1,36 +1,63 @@
-<!-- apps/web/src/components/KioskMenuIcon.vue — thematic glyphs for DK sections.
-     Poster and calendar retain the original symbols chosen by the curator. -->
+<!-- apps/web/src/components/KioskMenuIcon.vue
+     All eight kiosk menu glyphs use real two-tone SVG and inherit the published visitor theme.
+     Poster keeps its distinctive star; calendar keeps its grid motif. -->
 <script setup lang="ts">
-defineProps<{name:string}>();
+type MenuSection='posters'|'groups'|'calendar'|'documents'|'safety'|'about'|'contacts'|'navigation';
+defineProps<{name:MenuSection}>();
 </script>
+
 <template>
- <svg viewBox="0 0 24 24" width="27" height="27" aria-hidden="true" focusable="false"
-  fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <g v-if="name==='groups'">
-    <path d="M2.5 3.5h8v7c0 4-1.9 6.4-4 8.1-2.3-1.7-4-4.1-4-8.1v-7Z"/>
-    <path d="M13.5 5.5h8v7c0 4-2 6.6-4 8-2.3-1.4-4-4-4-8v-7Z"/>
-    <path d="M4.8 8.2h.1m3.2 0h.1m-3.4 4.3q1.7-1.7 3.6 0"/>
-    <path d="M15.7 10.3h.1m3 0h.1m-3.2 4.5q1.8 2.3 3.6 0"/>
-  </g>
-  <g v-else-if="name==='documents'">
-    <path d="M6 3h11a4 4 0 0 1 4 4v14H7a4 4 0 0 1-4-4V7a4 4 0 0 1 3-4Z"/>
-    <path d="M7 3v14a2 2 0 1 1-4 0M11 8h7M11 12h7M11 16h4"/>
-  </g>
-  <g v-else-if="name==='safety'">
-    <path d="M12 2 4.5 5v6c0 5.4 3.1 8.7 7.5 11 4.4-2.3 7.5-5.6 7.5-11V5L12 2Z"/>
-    <path d="m8.5 12.3 2.4 2.2 4.8-5"/>
-  </g>
-  <g v-else-if="name==='about'">
-    <path d="m3 9 9-6 9 6v2H3V9ZM2 21h20M4 18.5h16M5.5 11v7.5M10 11v7.5M14 11v7.5M18.5 11v7.5"/>
-  </g>
-  <g v-else-if="name==='contacts'">
-    <rect x="2.5" y="3.5" width="19" height="17" rx="2"/>
-    <circle cx="8.5" cy="10" r="2.1"/>
-    <path d="M5 16.5c0-2 1.4-3.1 3.5-3.1s3.5 1.1 3.5 3.1M15 9h3.5M15 13h3.5M15 17h2.5"/>
-  </g>
-  <g v-else-if="name==='navigation'">
-    <path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6ZM9 3v15M15 6v15"/>
-    <circle cx="17.5" cy="11" r="1.3"/>
-  </g>
- </svg>
+  <svg class="kiosk-menu-svg" viewBox="0 0 28 28" width="32" height="32"
+    xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"
+    fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Афиша: same recognizable star silhouette, with a contrasting dot/orbit -->
+    <g v-if="name==='posters'">
+      <path class="menu-icon-secondary-solid" d="m14 1.8 2.5 8.2 8.3 4-8.3 3-2.5 9.2-2.5-9.2-8.3-3 8.3-4Z"/>
+      <path class="menu-icon-primary" d="M4 4.5h3.5M20.5 23.5H24"/>
+    </g>
+    <!-- Коллективы: two contrasting stage masks -->
+    <g v-else-if="name==='groups'">
+      <path class="menu-icon-primary" d="M2.4 4.2h10.8v9.6c0 5-2.4 8-5.4 9.9-3.1-2.1-5.4-4.9-5.4-9.9V4.2Z"/>
+      <path class="menu-icon-secondary" d="M14.8 5h10.8v9.4c0 5-2.4 8-5.4 9.8-3.1-1.8-5.4-4.8-5.4-9.8V5Z"/>
+      <path class="menu-icon-primary" d="M5.4 10h.1m4.1 0h.1M5.2 16c1.7-2 3.9-2 5.6 0"/>
+      <path class="menu-icon-secondary" d="M17.6 11h.1m4 0h.1m-4.4 6c1.8 1.6 3.7 1.6 5.5 0"/>
+    </g>
+    <!-- Календарь: recognizable grid, highlighted date -->
+    <g v-else-if="name==='calendar'">
+      <rect class="menu-icon-primary" x="3.5" y="5.5" width="21" height="19" rx="2.4"/>
+      <path class="menu-icon-primary" d="M8.5 3v5m11-5v5M3.5 11h21M8.5 15.5h3M8.5 19.5h3M16 19.5h3"/>
+      <rect class="menu-icon-secondary-solid" x="15.2" y="14.2" width="5.5" height="3.8" rx="1"/>
+    </g>
+    <!-- Документы: archival document with accented seal -->
+    <g v-else-if="name==='documents'">
+      <path class="menu-icon-primary" d="M6 2.7h11l5 5.2v16.4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4.7a2 2 0 0 1 2-2Z"/>
+      <path class="menu-icon-primary" d="M17 2.7v5.5h5M8.4 13.4h10M8.4 17.2h7.1"/>
+      <circle class="menu-icon-secondary" cx="17.7" cy="21.8" r="3.2"/>
+      <path class="menu-icon-secondary" d="m15.8 24.4-1 2.3m4.8-2.3 1 2.3"/>
+    </g>
+    <!-- Безопасность: two-tone protection shield -->
+    <g v-else-if="name==='safety'">
+      <path class="menu-icon-primary" d="M14 2.5 4.8 6v7.2c0 6.4 3.6 10 9.2 12.5 5.6-2.5 9.2-6.1 9.2-12.5V6L14 2.5Z"/>
+      <path class="menu-icon-secondary" d="m9.2 13.9 3.4 3.4 6.7-7.1"/>
+    </g>
+    <!-- О ДК: classical culture-house facade with colored roof -->
+    <g v-else-if="name==='about'">
+      <path class="menu-icon-secondary" d="m2 9 12-6.2L26 9v2H2V9Z"/>
+      <path class="menu-icon-primary" d="M2.5 24.4h23M4.5 21.1h19M6.2 11v10m5.2-10v10m5.2-10v10m5.2-10v10"/>
+      <path class="menu-icon-secondary" d="M9.7 14h8.6"/>
+    </g>
+    <!-- Контакты: ID card with accented person -->
+    <g v-else-if="name==='contacts'">
+      <rect class="menu-icon-primary" x="2.4" y="4" width="23.2" height="20" rx="3"/>
+      <circle class="menu-icon-secondary" cx="9" cy="11.1" r="2.4"/>
+      <path class="menu-icon-secondary" d="M4.8 19c0-2.7 1.5-4.1 4.2-4.1s4.2 1.4 4.2 4.1"/>
+      <path class="menu-icon-primary" d="M16.7 10.7h5M16.7 15.2h5m-5 4.5h3.2"/>
+    </g>
+    <!-- Навигация: folded map with colored destination pin -->
+    <g v-else-if="name==='navigation'">
+      <path class="menu-icon-primary" d="m2.8 6.5 7.4-3.2 7.5 3.2 7.5-3.2v18.1l-7.5 3.2-7.5-3.2-7.4 3.2V6.5ZM10.2 3.3v18.1m7.5-14.9v6.1m0 7.2v4.8"/>
+      <path class="menu-icon-secondary" d="M22.8 13.2c0 2.7-3.4 5.9-3.4 5.9s-3.5-3.2-3.5-5.9a3.45 3.45 0 0 1 6.9 0Z"/>
+      <circle class="menu-icon-secondary-solid" cx="19.4" cy="13.2" r="1"/>
+    </g>
+  </svg>
 </template>

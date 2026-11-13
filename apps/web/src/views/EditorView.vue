@@ -7,6 +7,7 @@ import EventEditor from '../components/EventEditor.vue';
 import DocumentEditor from '../components/DocumentEditor.vue';
 import CultureEditor from '../components/CultureEditor.vue';
 import KioskKeyboard from '../components/KioskKeyboard.vue';
+import DkLogo from '../components/DkLogo.vue';
 type Role = 'admin' | 'editor' | 'viewer';
 type Account = {id:string; username:string; displayName:string; role:Role};
 type Page = {id:string;slug:string;title:string;body:string;revision:number;published_revision:number|null};
@@ -210,7 +211,11 @@ onBeforeUnmount(()=>{
 <template>
   <main class="editor-shell">
     <header class="editor-header">
-      <div><span class="eyebrow">НАВИКУЛЬТУРА / УПРАВЛЕНИЕ</span><h1>Кабинет сотрудника<span class="dot">.</span></h1></div>
+      <div class="editor-brand-line">
+        <DkLogo class="editor-brand-logo"/>
+        <div><span class="eyebrow">НАВИКУЛЬТУРА / УПРАВЛЕНИЕ</span>
+          <h1>Кабинет сотрудника<span class="dot">.</span></h1></div>
+      </div>
       <a class="editor-link" href="/screen">Экран посетителя →</a>
     </header>
     <section v-if="!user" class="editor-panel login-panel">

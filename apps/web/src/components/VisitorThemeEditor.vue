@@ -1,6 +1,8 @@
 <!-- apps/web/src/components/VisitorThemeEditor.vue — site-wide kiosk appearance, not per-card controls. -->
 <script setup lang="ts">
 import { computed,onMounted,ref } from 'vue';
+import DkLogo from './DkLogo.vue';
+import KioskMenuIcon from './KioskMenuIcon.vue';
 type ThemeId='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
 type ThemeSettings={draft:ThemeId;published:ThemeId;revision:number;published_revision:number;updatedAt:string};
 type ThemeInfo={id:ThemeId;name:string;description:string};
@@ -69,7 +71,7 @@ onMounted(()=>{void load();});
       <div>
         <span class="eyebrow">ОФОРМЛЕНИЕ ВСЕЙ НАВИКУЛЬТУРЫ</span>
         <h2>Темы для посетителей</h2>
-        <p class="editor-hint">Единый стиль афиш, расписания, карточек и меню. Выберите тему, посмотрите предпросмотр, сохраните выбор и опубликуйте.</p>
+        <p class="editor-hint">Единый стиль афиш, календаря, карточек и двухцветных значков меню. Выберите тему, посмотрите предпросмотр, сохраните выбор и опубликуйте.</p>
         <p class="editor-hint">Сейчас на экране посетителя: <strong>{{publishedName}}</strong>.</p>
       </div>
       <button type="button" class="secondary-button" :disabled="busy" @click="load">Обновить</button>
@@ -79,9 +81,9 @@ onMounted(()=>{void load();});
         :class="{selected:choice===item.id}" :aria-pressed="choice===item.id"
         :disabled="busy||role==='viewer'" @click="choice=item.id;status='Предпросмотр темы — ещё не опубликована';error=''">
         <div class="visitor-theme-preview" :data-visitor-theme="item.id" aria-hidden="true">
-          <div class="theme-mini-header"><span><i>Н</i> НАВИКУЛЬТУРА</span><span>ДК</span></div>
+          <div class="theme-mini-header"><DkLogo class="theme-mini-dk-logo"/><span>ДК</span></div>
           <div class="theme-mini-title">Афиша.</div>
-          <div class="theme-mini-controls"><span>Концерты</span><span>Коллективы</span></div>
+          <div class="theme-mini-controls theme-mini-icons"><span><KioskMenuIcon name="posters"/> Афиша</span><span><KioskMenuIcon name="groups"/> Коллективы</span></div>
           <div class="theme-mini-bottom"><span>События · Навигация</span><span>01 / 08</span></div>
         </div>
         <strong>{{item.name}}</strong>
@@ -92,10 +94,10 @@ onMounted(()=>{void load();});
     <div class="visitor-theme-large">
       <span class="eyebrow">ПРЕДПРОСМОТР · {{selectedName.toUpperCase()}}</span>
       <div class="visitor-theme-preview" :data-visitor-theme="choice" aria-label="Предпросмотр выбранной темы">
-        <div class="theme-mini-header"><span><i>Н</i> НАВИКУЛЬТУРА · ДК «КИРОВСКИЙ»</span><span>СЕГОДНЯ</span></div>
+        <div class="theme-mini-header"><DkLogo class="theme-mini-dk-logo"/><span>СЕГОДНЯ</span></div>
         <div class="theme-mini-title">Афиша и события.</div>
-        <div class="theme-mini-controls"><span>Афиша</span><span>Расписание</span><span>Коллективы</span></div>
-        <div class="theme-mini-bottom"><span>Найдите нужное событие</span><span>НАВИКУЛЬТУРА</span></div>
+        <div class="theme-mini-controls theme-mini-icons"><span><KioskMenuIcon name="posters"/> Афиша</span><span><KioskMenuIcon name="calendar"/> Календарь</span><span><KioskMenuIcon name="groups"/> Коллективы</span></div>
+        <div class="theme-mini-bottom"><span>Найдите нужное событие</span><span>ГДК «КИРОВСКИЙ»</span></div>
       </div>
     </div>
     <div class="visitor-theme-actions">
@@ -105,6 +107,6 @@ onMounted(()=>{void load();});
       <p role="status">{{status}}</p>
     </div>
     <p v-if="error" class="editor-error" role="alert">{{error}}</p>
-    <p class="editor-hint">Тема меняет только внешний вид. Содержимое карточек, афиш и расписания не затрагивается. Если передумали, выберите прежнюю тему и опубликуйте снова.</p>
+    <p class="editor-hint">Тема меняет только внешний вид и два цвета SVG-значков. Данные коллективов, афиш и календаря не затрагиваются. Вернуть прежнюю тему можно повторной публикацией.</p>
   </section>
 </template>
