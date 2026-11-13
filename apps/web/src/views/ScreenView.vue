@@ -12,7 +12,7 @@ import MediaViewer from '../components/MediaViewer.vue';
 import type {KioskSearchResult} from '../utils/global-search.ts';
 import type {CultureContent} from '../utils/culture-types.js';
 import type {PublicEvent,PublicDocument} from '../utils/content-types.js';
-import {visiblePosterWindow,shouldReturnHome} from '../utils/kiosk-behavior.js';
+import {visiblePosterWindow,shouldReturnHome,posterSwipe} from '../utils/kiosk-behavior.js';
 
 const MUZA_ORGANIZATION='https://muzaticket.ru/iframe/organizations/organization-mau-gdk-kirovskii-448753';
 const items=[
@@ -113,7 +113,8 @@ function posterTouchEnd(event:PointerEvent){
   const start=touchStart;touchStart=null;
   if(!start||start.id!==event.pointerId||(event.target as HTMLElement).closest('button'))return;
   const dx=event.clientX-start.x,dy=event.clientY-start.y;
-  if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.25)movePoster(dx<0?1:-1);
+  const direction=posterSwipe(dx,dy);
+  if(direction)movePoster(direction);
 }
 function posterTouchCancel(){touchStart=null;}
 function resetIdle(){
