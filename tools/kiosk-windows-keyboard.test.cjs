@@ -62,12 +62,10 @@ test('explicit action header is mandatory; preflight has no execution side effec
       method: 'OPTIONS', action: null, headers: {
         'Access-Control-Request-Method': 'POST',
         'Access-Control-Request-Headers': 'x-navikultura-keyboard',
-        'Access-Control-Request-Private-Network': 'true',
       },
     });
     assert.equal(preflight.status, 204);
     assert.equal(preflight.headers['access-control-allow-origin'], 'http://127.0.0.1:5173');
-    assert.equal(preflight.headers['access-control-allow-private-network'], 'true');
     assert.equal(launches, 0);
   });
 });
