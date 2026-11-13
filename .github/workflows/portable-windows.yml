@@ -1,5 +1,5 @@
-# .github/workflows/portable-windows.yml — reproducible Windows runner build for a single portable EXE.
-name: Windows Portable EXE
+# .github/workflows/portable-windows.yml — reproducible installer + portable Windows release.
+name: Windows Installer and Portable
 on:
   workflow_dispatch:
   pull_request:
@@ -32,7 +32,7 @@ jobs:
         run: npm run stage --prefix desktop
       - name: Validate first-run desktop storage
         run: npm run test --prefix desktop
-      - name: Build one portable Windows x64 EXE
+      - name: Build Windows installer and portable x64 EXE
         run: npm run package:win --prefix desktop
       - name: Smoke-test unpacked desktop application
         shell: pwsh
@@ -44,15 +44,26 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "Desktop smoke failed with code $($p.ExitCode)" }
           $firstRun = Start-Process -FilePath $exe.FullName -ArgumentList '--smoke-onboarding' -Wait -PassThru
           if ($firstRun.ExitCode -ne 0) { throw "Real Electron first-run IPC smoke failed with code $($firstRun.ExitCode)" }
-          $portable = @(Get-ChildItem 'desktop/dist' -Filter 'Navikultura-*-Windows-x64.exe' -File)
-          if ($portable.Count -ne 1) { throw "Expected one portable EXE, got $($portable.Count)" }
-          $hash = Get-FileHash $portable[0].FullName -Algorithm SHA256
-          Write-Output "EXE: $($portable[0].Name) SIZE: $($portable[0].Length) SHA256: $($hash.Hash)"
+          $installer = @(Get-ChildItem 'desktop/dist' -Filter 'Navikultura-*-Setup-Windows-x64.exe' -File)
+          $portable = @(Get-ChildItem 'desktop/dist' -Filter 'Navikultura-*-Portable-Windows-x64.exe' -File)
+          if ($installer.Count -ne 1 -or $portable.Count -ne 1) { throw 'Installer or portable EXE missing' }
+          foreach ($file in @($installer[0],$portable[0])) {
+            $hash = Get-FileHash $file.FullName -Algorithm SHA256
+            Write-Output "EXE: $($file.Name) SIZE: $($file.Length) SHA256: $($hash.Hash)"
+          }
+      - name: Upload Windows Installer EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Navikultura-Windows-Installer-exe
+          path: desktop/dist/Navikultura-*-Setup-Windows-x64.exe
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
       - name: Upload portable Windows EXE
         uses: actions/upload-artifact@v4
         with:
-          name: Navikultura-Windows-portable-exe
-          path: desktop/dist/Navikultura-*-Windows-x64.exe
+          name: Navikultura-Windows-Portable-exe
+          path: desktop/dist/Navikultura-*-Portable-Windows-x64.exe
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
