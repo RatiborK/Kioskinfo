@@ -15,7 +15,7 @@ test('initial DK catalog is substantial, categorized and source-backed',()=>{
   assert.equal(new Set(original.leaders.map(l=>l.id)).size,original.leaders.length);
   assert.ok(original.collectives.every(c=>c.source.startsWith('Расписание занятий') && c.sourcePage>=1));
   assert.ok(original.leaders.every(l=>l.photo===''));
-  assert.equal(original.tickets.url,'https://gorodsobitiy.ru/venues/dk-kirovsky');
+  assert.equal(original.tickets.url,'https://muzaticket.ru/iframe/organizations/organization-mau-gdk-kirovskii-448753');
   assert.ok(original.safety.sections.length>=6);
 });
 test('editing catalog does not change visitor content before publication',async()=>{
