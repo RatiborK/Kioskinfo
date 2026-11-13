@@ -57,7 +57,7 @@ function createKeyboardServer({
   const server = http.createServer((req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Vary', 'Origin, Access-Control-Request-Private-Network');
+    res.setHeader('Vary', 'Origin');
     const response = (code, message) => {
       res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ ok: code === 200, message }));
@@ -88,9 +88,6 @@ function createKeyboardServer({
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'X-Navikultura-Keyboard');
       res.setHeader('Access-Control-Max-Age', '600');
-      if (req.headers['access-control-request-private-network'] === 'true') {
-        res.setHeader('Access-Control-Allow-Private-Network', 'true');
-      }
       res.writeHead(204);
       res.end();
       return;
