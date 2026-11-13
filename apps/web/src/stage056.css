@@ -187,32 +187,64 @@
   background:#ff6a00;color:#111;border-color:#ff6a00}
 @media(max-width:720px){.login-touch-keyboard .kiosk-key{min-width:31px;flex-basis:31px;font-size:15px}}
 
-/* Stage 05.6.1: cultural thematic pictograms, keeping original poster/calendar signs. */
+/* Stage 05.7: every menu pictogram is a bare, frameless, theme-aware two-tone SVG. */
 .screen-shell .nav-glyph{
-  display:inline-flex;justify-content:center;align-items:center;
-  flex:0 0 40px;width:40px;height:40px;
-  color:var(--v-alt);background:var(--v-card);border:1px solid var(--v-line);
-  border-radius:10px;line-height:1;
-  transition:color .18s ease,background-color .18s ease,border-color .18s ease;
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;
+  width:44px;height:44px;min-width:44px;min-height:44px;
+  padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;
+  color:var(--nav-icon-primary);pointer-events:none;
+  transition:color .18s ease,transform .18s ease;
 }
-.screen-shell .nav-glyph svg{width:27px;height:27px;display:block;flex:0 0 27px}
-.screen-shell .nav-glyph-original{
-  font-size:26px;font-weight:800;color:var(--v-accent);
-  border-color:transparent;background:transparent
+.screen-shell .nav-glyph .kiosk-menu-svg{
+  display:block;width:32px;height:32px;flex:0 0 32px;
+  overflow:visible;filter:none;
 }
-.screen-shell .nav-item.active .nav-glyph:not(.nav-glyph-original),
-.screen-shell .nav-item:hover .nav-glyph:not(.nav-glyph-original){
-  color:var(--v-accent);border-color:var(--v-accent);
+.screen-shell .nav-glyph .menu-icon-primary{stroke:var(--nav-icon-primary)}
+.screen-shell .nav-glyph .menu-icon-secondary{stroke:var(--nav-icon-secondary)}
+.screen-shell .nav-glyph .menu-icon-secondary-solid{
+  fill:var(--nav-icon-secondary);stroke:var(--nav-icon-secondary);
 }
-.screen-shell[data-visitor-theme="dk"] .nav-item .nav-glyph{color:#0b5ba8}
-.screen-shell[data-visitor-theme="dk"] .nav-item .nav-glyph-original{color:#ff6a00}
+.screen-shell .nav-item.active .nav-glyph,
+.screen-shell .nav-item:hover .nav-glyph,
+.screen-shell .nav-item:focus-visible .nav-glyph{
+  --nav-icon-primary:var(--nav-icon-primary-active);
+  --nav-icon-secondary:var(--nav-icon-secondary-active);
+}
+.screen-shell .nav-item.active .kiosk-menu-svg{transform:scale(1.08)}
+.screen-shell .nav-item .nav-glyph{border:0;background:transparent}
 .screen-shell[data-visitor-theme="dk"] .nav-item.active .nav-glyph,
 .screen-shell[data-visitor-theme="dk"] .nav-item:hover .nav-glyph{
-  color:#ea6100;border-color:#ffd2b0;background:#fff6ef
+  border:0;background:transparent;box-shadow:none;
 }
-.screen-shell[data-visitor-theme="dk"] .nav-item.active .nav-glyph-original,
-.screen-shell[data-visitor-theme="dk"] .nav-item:hover .nav-glyph-original{
-  background:transparent;border-color:transparent;color:#e75c00
+/* Official brand lockup on white, independent of the visitor theme background.
+   Scaling preserves wordmark legibility in full-page kiosk mode. */
+.screen-shell .kiosk-dk-logo{
+  display:block;flex:0 1 auto;width:clamp(192px,22vw,278px);height:auto;
+  max-height:64px;margin-right:auto;padding:4px 7px;background:#fff;
+  border:0;border-radius:6px;box-sizing:border-box;overflow:visible;
+}
+.screen-shell.kiosk-home .kiosk-dk-logo{
+  flex:0 1 auto;width:clamp(192px,22vw,278px);height:auto;max-height:61px;
+}
+.editor-brand-logo{
+  display:block;width:clamp(185px,18vw,252px);height:auto;
+  padding:5px 7px;background:#fff;border-radius:7px;box-sizing:border-box;
+}
+.editor-brand-line{display:flex;align-items:center;gap:22px;min-width:0}
+@media(max-width:950px){
+  .screen-shell .nav-glyph{display:inline-flex;width:38px;height:38px;min-width:38px;min-height:38px;flex:0 0 38px}
+  .screen-shell .nav-glyph .kiosk-menu-svg{width:29px;height:29px;flex:0 0 29px}
+}
+@media(max-width:560px){
+  .screen-shell .nav-glyph{width:33px;height:33px;min-width:33px;min-height:33px;flex:0 0 33px}
+  .screen-shell .nav-glyph .kiosk-menu-svg{width:26px;height:26px;flex:0 0 26px}
+  .screen-shell .kiosk-dk-logo{width:clamp(170px,45vw,230px)}
+  .screen-shell.kiosk-home .kiosk-dk-logo{width:clamp(170px,45vw,230px)}
+  .editor-brand-line{align-items:flex-start;flex-direction:column;gap:14px}
+}
+@media(prefers-reduced-motion:reduce){
+  .screen-shell .nav-glyph{transition:none}
+  .screen-shell .nav-item.active .kiosk-menu-svg{transform:none}
 }
 /* A catalog outage should never look like deleted content. */
 .screen-shell .kiosk-culture-warning{
