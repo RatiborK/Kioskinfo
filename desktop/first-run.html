@@ -21,6 +21,18 @@
       <label>Повторите пароль
         <input type="password" id="confirm" required minlength="12" maxlength="128" autocomplete="new-password">
       </label>
+      <section class="touch-keyboard" id="touch-keyboard" aria-label="Экранная клавиатура для пароля">
+        <div class="touch-keyboard-top"><strong>Экранная клавиатура</strong>
+          <button type="button" id="change-layout">EN / РУ</button>
+          <button type="button" id="change-case">⇧ Регистр</button>
+        </div>
+        <div id="keyboard-rows" class="touch-keyboard-rows"></div>
+        <div class="touch-keyboard-actions">
+          <button type="button" data-key="space">Пробел</button>
+          <button type="button" data-key="backspace">⌫ Удалить</button>
+          <button type="button" data-key="clear">Очистить поле</button>
+        </div>
+      </section>
       <p class="error" role="alert" id="error"></p>
       <button type="submit" id="submit">Создать администратора и открыть экран</button>
     </form>
