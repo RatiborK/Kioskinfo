@@ -7,7 +7,7 @@ type ThemeId='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
 type ThemeSettings={draft:ThemeId;published:ThemeId;revision:number;published_revision:number;updatedAt:string};
 type ThemeInfo={id:ThemeId;name:string;description:string};
 const themes:ThemeInfo[]=[
-  {id:'dk',name:'Стиль сайта ДК',description:'Белый фон, оранжевые и синие акценты, геометрия сайта Кировского'},
+  {id:'dk',name:'Стиль сайта ДК',description:'Тёмный сине-серый фон, мягкое бирюзовое свечение, оранжевые и синие акценты'},
   {id:'holiday',name:'Праздничная',description:'Тёплый свет, глубокий бордовый и золото'},
   {id:'modern',name:'Стильная',description:'Чистый минимализм, графика и типографика'},
   {id:'aurora',name:'Северное сияние',description:'Бирюзовые и синие световые переливы'},
