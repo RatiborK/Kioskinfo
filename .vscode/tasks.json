@@ -60,6 +60,24 @@
         "panel": "dedicated"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "Navikultura: Kiosk preview (Edge fullscreen)",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$paths=@((Join-Path ([Environment]::GetFolderPath('ProgramFilesX86')) 'Microsoft\\Edge\\Application\\msedge.exe'),(Join-Path ([Environment]::GetFolderPath('ProgramFiles')) 'Microsoft\\Edge\\Application\\msedge.exe')); $edge=$paths|Where-Object{Test-Path -LiteralPath $_}|Select-Object -First 1; if(-not $edge){throw 'Microsoft Edge не найден'}; Start-Process -FilePath $edge -ArgumentList @('--kiosk','http://127.0.0.1:5173/screen','--edge-kiosk-type=fullscreen','--no-first-run')"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
     }
   ]
 }
