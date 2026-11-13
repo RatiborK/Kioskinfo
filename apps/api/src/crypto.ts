@@ -5,11 +5,21 @@ const scrypt = promisify(scryptCallback);
 const KEY_LENGTH = 64;
 export function tokenHash(token: string): string { return createHash('sha256').update(token).digest('hex'); }
 export function createSessionToken(): string { return randomBytes(32).toString('base64url'); }
-export async function hashPassword(password: string): Promise<string> {
-  if (password.length < 12 || password.length > 128) throw new Error('Пароль должен содержать от 12 до 128 символов');
-  const salt = randomBytes(24).toString('hex');
-  const derived = (await scrypt(password, Buffer.from(salt, 'hex'), KEY_LENGTH)) as Buffer;
-  return `scrypt$${salt}$${derived.toString('hex')}`;
+async function hashWithMinimumLength(password:string,minimum:number):Promise<string>{
+  if(typeof password!=='string'||password.length<minimum||password.length>128)
+    throw new Error(`Пароль должен содержать от ${minimum} до 128 символов`);
+  const salt=randomBytes(24).toString('hex');
+  const derived=(await scrypt(password,Buffer.from(salt,'hex'),KEY_LENGTH)) as Buffer;
+  return `scrypt${salt}${derived.toString('hex')}`;
+}
+// Production-facing accounts always require at least 12 characters.
+export function hashPassword(password:string):Promise<string>{
+  return hashWithMinimumLength(password,12);
+}
+// Preview-only credential, restricted by index-preview.ts to the loopback interface.
+// Do not call this for accounts created by production API.
+export function hashLocalPreviewPassword(password:string):Promise<string>{
+  return hashWithMinimumLength(password,8);
 }
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   if (typeof password !== 'string' || password.length > 128) return false;
