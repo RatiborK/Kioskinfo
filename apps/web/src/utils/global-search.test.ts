@@ -1,7 +1,7 @@
 // apps/web/src/utils/global-search.test.ts
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {searchKiosk} from './global-search.js';
+import {searchKiosk} from './global-search.ts';
 import type {CultureContent} from './culture-types.js';
 const sample:CultureContent={
  about:{title:'Дворец культуры Кировский',intro:'История учреждения',facts:[],history:[],videoUrl:'',photo:'',photoCredit:'',sourceUrl:''},
