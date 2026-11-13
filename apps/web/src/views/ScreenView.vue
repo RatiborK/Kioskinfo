@@ -12,6 +12,7 @@ import DkLogo from '../components/DkLogo.vue';
 import GlobalSearch from '../components/GlobalSearch.vue';
 import TicketWidget from '../components/TicketWidget.vue';
 import MediaViewer from '../components/MediaViewer.vue';
+import {DK_BACKGROUND,DK_GLOW,dkThemeVars,normalizeHex} from '../utils/dk-colors.js';
 import type {KioskSearchResult} from '../utils/global-search.ts';
 import type {CultureContent} from '../utils/culture-types.js';
 import type {PublicEvent,PublicDocument} from '../utils/content-types.js';
@@ -51,6 +52,8 @@ const selectedFloorId=ref('floor-1'),selectedMapPoint=ref('');
 type VisitorTheme='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
 const visitorTheme=ref<VisitorTheme>('dk'),knownThemes=new Set(['dk','holiday','modern','aurora','poster','gallery','neon','kids']);
 const fullscreenEnabled=ref(false),fullscreenActive=ref(false);
+const dkBackground=ref(DK_BACKGROUND),dkGlow=ref(DK_GLOW);
+const dkStyle=computed(()=>visitorTheme.value==='dk'?dkThemeVars(dkBackground.value,dkGlow.value):undefined);
 let fullscreenGestureFailed=false;
 function syncFullscreen(){fullscreenActive.value=!!document.fullscreenElement;}
 function fullscreenOnGesture(){
@@ -178,7 +181,9 @@ async function reloadPosters(){
 }
 async function reloadTheme(){
   try{const r=await fetch('/api/public/theme',{cache:'no-store'});if(!r.ok)return;
-    const data:{theme:string;fullscreenEnabled?:boolean}=await r.json();
+    const data:{theme:string;fullscreenEnabled?:boolean;dkBackground?:string;dkGlow?:string}=await r.json();
+    dkBackground.value=normalizeHex(data.dkBackground,DK_BACKGROUND);
+    dkGlow.value=normalizeHex(data.dkGlow,DK_GLOW);
     if(knownThemes.has(data.theme))visitorTheme.value=data.theme as VisitorTheme;
     const previouslyEnabled=fullscreenEnabled.value;
     fullscreenEnabled.value=data.fullscreenEnabled===true;
@@ -219,7 +224,7 @@ onBeforeUnmount(()=>{
 });
 </script>
 <template>
-  <main class="shell screen-shell" :class="{'kiosk-home':current==='posters'}" :data-visitor-theme="visitorTheme">
+  <main class="shell screen-shell" :class="{'kiosk-home':current==='posters'}" :data-visitor-theme="visitorTheme" :style="dkStyle">
     <Transition name="kiosk-page" mode="out-in" @after-enter="onEnter">
       <div :key="current" ref="scrollRegion" class="screen-content" :class="{'screen-poster-page':current==='posters'}">
         <header class="brand-row">
