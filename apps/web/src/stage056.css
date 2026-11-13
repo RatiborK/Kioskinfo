@@ -437,3 +437,48 @@
 .visitor-kiosk-fullscreen input{width:22px;height:22px;flex:0 0 22px;accent-color:#ff6a00}
 .visitor-kiosk-settings p{margin:13px 0 0;font-size:13px}
 @media(max-width:580px){.editor-header-actions{width:100%}.login-panel .login-touch-keyboard .kiosk-key{min-width:23px;font-size:13px}}
+
+/* Stage 05.8.2 — editable DK palette; composited color updates never restart the glow. */
+.screen-shell[data-visitor-theme="dk"] .screen-content{
+  background-image:repeating-linear-gradient(90deg,transparent 0 83px,rgba(var(--dk-line-rgb,248,251,255),.045) 83px 84px),
+    linear-gradient(155deg,rgba(var(--dk-glow-rgb,76,161,175),.10),transparent 52%);
+}
+.screen-shell[data-visitor-theme="dk"]::before{
+  background:radial-gradient(ellipse at center,rgba(var(--dk-glow-rgb,76,161,175),.42) 0%,
+    rgba(var(--dk-glow-rgb,76,161,175),.16) 36%,transparent 74%);
+}
+.visitor-theme-preview[data-visitor-theme="dk"]::after{
+  background:radial-gradient(ellipse at center,rgba(var(--dk-glow-rgb,76,161,175),.44),
+    rgba(var(--dk-glow-rgb,76,161,175),.14) 42%,transparent 74%);
+}
+:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="dk"] .dk-brand-lockup{
+  --dk-logo-ink:var(--dk-adaptive-ink,#f2f7fb);
+}
+/* Reserve the stripe gutter independently of animation and active state. */
+.screen-shell .side-menu .nav-item{
+  padding-left:clamp(18px,1.35vw,26px);
+  padding-right:8px;
+}
+.screen-shell .side-menu .nav-index{flex:0 0 21px;min-width:21px}
+@media(max-width:950px){
+  .screen-shell .side-menu .nav-item{padding-left:16px;padding-right:12px;padding-bottom:17px}
+}
+/* The two DK color wheels are editor-only; input[type=color] opens the native palette. */
+.visitor-dk-color-settings{
+  margin-top:22px;padding:18px 20px;border:1px solid #515b61;border-radius:12px;
+  background:#1b2024;color:#f5f5f5
+}
+.visitor-dk-color-heading h3{font-size:19px;margin:0 0 6px}
+.visitor-dk-color-heading p{margin:0 0 18px;font-size:13px}
+.visitor-dk-color-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.visitor-dk-color-field{
+  display:grid;grid-template-columns:72px minmax(0,1fr);column-gap:12px;align-items:center;
+  padding:13px;background:#242b30;border:1px solid #53606b;border-radius:10px
+}
+.visitor-dk-color-field span{grid-column:1/-1;margin-bottom:8px;font-weight:750;font-size:14px}
+.visitor-dk-color-field input[type=color]{width:72px;height:55px;padding:3px;cursor:pointer;border-radius:8px;border:1px solid #a5aeb4;background:#333b45}
+.visitor-dk-color-field code{font-size:16px;color:#e8f1f7}
+.visitor-dk-color-field input[type=color]:focus-visible{outline:3px solid #ff6a00;outline-offset:3px}
+.visitor-dk-color-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:16px}
+.visitor-dk-color-actions .editor-hint{margin:0;max-width:410px;font-size:13px}
+@media(max-width:650px){.visitor-dk-color-grid{grid-template-columns:1fr}}
