@@ -10,7 +10,7 @@ import { defaultScheduleFields, type ScheduleRepository } from './schedule.js';
 import { FileThemeRepository } from './themes.js';
 import { FileEventsRepository } from './events.js';
 import { FolderDocumentsRepository } from './documents.js';
-import {FileCultureRepository,CultureMedia,defaultCultureState} from './culture.js';
+import {FileCultureRepository,CultureMedia,CultureVideos,defaultCultureState} from './culture.js';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -34,9 +34,9 @@ class MemoryStore implements Store {
 }
 const headers={'content-type':'application/json','x-navikultura-action':'1'};
 const loginBody=(username:string,password:string)=>({method:'POST' as const,url:'/api/auth/login',headers,payload:{username,password}});
-async function fixture(role:'admin'|'editor'|'viewer'='admin', posters?:FolderPosterRepository, schedule?:ScheduleRepository){
+async function fixture(role:'admin'|'editor'|'viewer'='admin', posters?:FolderPosterRepository, schedule?:ScheduleRepository, videos?:CultureVideos){
   const store=new MemoryStore();store.accounts=[{id:'account1',username:'worker',display_name:'Сотрудник',role,password_hash:await hashPassword('some-strong-password-123'),enabled:true}];
-  const app=createApp({store,posters,schedule,allowedOrigin:'http://127.0.0.1:5173'});
+  const app=createApp({store,posters,schedule,videos,allowedOrigin:'http://127.0.0.1:5173'});
   const login=await app.inject(loginBody('worker','some-strong-password-123'));
   assert.equal(login.statusCode,200);
   const cookie=login.headers['set-cookie'];assert.equal(typeof cookie,'string');
@@ -406,5 +406,39 @@ test('admin can restore only missing base collectives, without publishing or gra
       headers:{...headers,cookie},payload:{expectedRevision:3}});
     assert.equal(again.statusCode,200);
     assert.equal(again.json().added.collectives,0);
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
+});
+
+test('local MP4 upload uses authenticated binary body and ranged in-app streaming',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-local-video-'));
+  const {app,cookie}=await fixture('admin',undefined,undefined,new CultureVideos(dir));
+  try{
+    const bytes=Buffer.concat([Buffer.from([0,0,0,16]),Buffer.from('ftypisom'),Buffer.alloc(96)]);
+    const uploaded=await app.inject({method:'POST',url:'/api/editor/culture/video',
+      headers:{cookie,'x-navikultura-action':'1','content-type':'application/octet-stream',
+        'x-navikultura-file-name':'tour.mp4'},
+      payload:bytes});
+    assert.equal(uploaded.statusCode,201,uploaded.body);
+    const url=uploaded.json().url as string;
+    assert.match(url,/^\/api\/public\/culture\/video\/[a-f0-9-]{36}\.mp4$/);
+    const full=await app.inject({method:'GET',url});
+    assert.equal(full.statusCode,200);
+    assert.equal(full.headers['content-type'],'video/mp4');
+    assert.equal(full.headers['accept-ranges'],'bytes');
+    assert.equal(full.headers['content-length'],String(bytes.length));
+    const partial=await app.inject({method:'GET',url,headers:{range:'bytes=4-11'}});
+    assert.equal(partial.statusCode,206);
+    assert.equal(partial.headers['content-range'],`bytes 4-11/${bytes.length}`);
+    assert.equal(partial.headers['content-length'],'8');
+    assert.equal(partial.rawPayload.toString('ascii'),'ftypisom');
+    assert.equal((await app.inject({method:'GET',url,headers:{range:'bytes=999-'}})).statusCode,416);
+    const fake=await app.inject({method:'POST',url:'/api/editor/culture/video',
+      headers:{cookie,'x-navikultura-action':'1','content-type':'application/octet-stream',
+        'x-navikultura-file-name':'fake.mp4'},payload:Buffer.from('not a real MP4 file')});
+    assert.equal(fake.statusCode,400);
+    const unauth=await app.inject({method:'POST',url:'/api/editor/culture/video',
+      headers:{'x-navikultura-action':'1','content-type':'application/octet-stream',
+        'x-navikultura-file-name':'tour.mp4'},payload:bytes});
+    assert.equal(unauth.statusCode,401);
   }finally{await app.close();await rm(dir,{recursive:true,force:true});}
 });
