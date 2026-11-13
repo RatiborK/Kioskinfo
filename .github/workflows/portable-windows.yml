@@ -42,6 +42,8 @@ jobs:
           if (-not $exe) { throw 'Windows unpacked EXE missing' }
           $p = Start-Process -FilePath $exe.FullName -ArgumentList '--smoke-test' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "Desktop smoke failed with code $($p.ExitCode)" }
+          $firstRun = Start-Process -FilePath $exe.FullName -ArgumentList '--smoke-onboarding' -Wait -PassThru
+          if ($firstRun.ExitCode -ne 0) { throw "Real Electron first-run IPC smoke failed with code $($firstRun.ExitCode)" }
           $portable = @(Get-ChildItem 'desktop/dist' -Filter 'Navikultura-*-Windows-x64.exe' -File)
           if ($portable.Count -ne 1) { throw "Expected one portable EXE, got $($portable.Count)" }
           $hash = Get-FileHash $portable[0].FullName -Algorithm SHA256
