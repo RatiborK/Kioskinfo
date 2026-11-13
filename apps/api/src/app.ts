@@ -221,7 +221,7 @@ export function createApp(options: AppOptions) {
   app.get('/api/public/theme',async (_request,reply)=>{
     reply.header('Cache-Control','no-store');
     const selected=themes?await themes.get():defaultThemeSettings();
-    return {theme:selected.published,revision:selected.published_revision};
+    return {theme:selected.published,revision:selected.published_revision,fullscreenEnabled:selected.fullscreenEnabled};
   });
   app.get('/api/editor/theme',async (request,reply)=>{
     const account=await requireRole(request,reply,['admin','editor','viewer']);
@@ -252,6 +252,17 @@ export function createApp(options: AppOptions) {
     const result=await themes.publish(Number(expectedRevision));
     if(!result)return reply.code(409).send({error:'Тема изменена другим сотрудником. Обновите список'});
     await store.audit(account.id,'theme.publish',{id:result.published,revision:result.revision});
+    reply.header('Cache-Control','no-store');return {settings:result};
+  });
+  app.post<{Body:{enabled?:unknown;expectedRevision?:unknown}}>('/api/editor/theme/fullscreen',async(request,reply)=>{
+    const account=await requireRole(request,reply,['admin']);if(!account)return;
+    if(!themes)return reply.code(503).send({error:'Хранилище тем не настроено'});
+    const {enabled,expectedRevision}=request.body??{};
+    if(typeof enabled!=='boolean'||!Number.isSafeInteger(expectedRevision)||Number(expectedRevision)<1)
+      return reply.code(400).send({error:'Укажите логическое значение и корректную версию'});
+    const result=await themes.setFullscreen(enabled,Number(expectedRevision));
+    if(!result)return reply.code(409).send({error:'Настройки изменены другим сотрудником. Обновите страницу'});
+    await store.audit(account.id,'theme.fullscreen',{enabled,revision:result.revision});
     reply.header('Cache-Control','no-store');return {settings:result};
   });
   // Browser schedule editor: drafts are private, only published snapshots reach the kiosk.
