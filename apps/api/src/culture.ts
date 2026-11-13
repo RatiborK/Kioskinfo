@@ -150,8 +150,10 @@ export function enrichLegacySafety(content:CultureContent):CultureContent{
       }
     }
     if(copy.safety.title==='Безопасность начинается с внимания')copy.safety.title=starterContent.safety.title;
-    copy.safety.intro=starterContent.safety.intro;
-    copy.safety.notice=starterContent.safety.notice;
+    if(copy.safety.intro==='Собрали памятки, которые помогут чувствовать себя уверенно в ДК. Информация ознакомительная; приоритет всегда у объявлений и указаний сотрудников учреждения.')
+      copy.safety.intro=starterContent.safety.intro;
+    if(copy.safety.notice==='Это общие рекомендации для посетителей, а не утверждённая инструкция по эвакуации. Схемы выходов и локальные инструкции учреждения требуют отдельного согласования.')
+      copy.safety.notice=starterContent.safety.notice;
   }
   // The previous edition used a different ticket platform. Don't expose it in the kiosk.
   if(copy.tickets.url==='https://gorodsobitiy.ru/venues/dk-kirovsky'){
