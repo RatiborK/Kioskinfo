@@ -48,7 +48,7 @@ defineExpose({chooseFloor,choosePoint});
         </div>
       </div>
       <div class="floor-navigation-viewport" tabindex="0" aria-label="План, прокрутка и увеличение">
-        <div class="floor-navigation-map" :style="{width:(zoom*100)+'%'}" @click="addPoint">
+        <div class="floor-navigation-map" :style="{width:(zoom*100)+'%',aspectRatio:floor.id==='floor-3'?'813 / 1220':'850 / 1162'}" @click="addPoint">
           <img :src="'/assets/navigation/'+floor.id+'.webp'" 
             :alt="'План ДК: '+floor.title+'. Схема без неподтверждённых подписей помещений.'"
             draggable="false" loading="lazy"/>
