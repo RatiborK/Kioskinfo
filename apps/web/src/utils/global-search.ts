@@ -1,6 +1,6 @@
 // apps/web/src/utils/global-search.ts
 // Full-kiosk local search: only previously published data, never unapproved drafts.
-import {normalizeSearch,queryVariants} from './kiosk-search.js';
+import {normalizeSearch,queryVariants} from './kiosk-search.ts';
 import type {CultureContent} from './culture-types.js';
 import type {PublicEvent,PublicDocument} from './content-types.js';
 export type SearchTarget='groups'|'calendar'|'documents'|'safety'|'about'|'contacts'|'posters'|'tickets';
