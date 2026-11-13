@@ -10,7 +10,7 @@ export const EVENT_VENUES=['hall','foyer','orfey'] as const;
 export type EventType=typeof EVENT_TYPES[number];
 export type EventVenue=typeof EVENT_VENUES[number];
 export interface EventFields{
-  title:string;date:string;time:string;type:EventType;venue:EventVenue;description:string;
+  title:string;date:string;time:string;type:EventType;venue:EventVenue;description:string;ticketUrl:string;
 }
 export interface EventRecord extends EventFields {
   id:string;revision:number;published:EventFields|null;updatedAt:string;
@@ -23,6 +23,17 @@ export interface EventsRepository{
   save(id:string,revision:number,fields:EventFields):Promise<EventRecord|null>;
   publish(id:string,revision:number):Promise<EventRecord|null>;
   remove(id:string,revision:number):Promise<boolean>;
+}
+export function validateTicketUrl(input:unknown):string{
+  if(input===undefined||input===null||input==='')return '';
+  if(typeof input!=='string'||input.length>600)throw Error('Ссылка на билет должна быть адресом Muzaticket');
+  let url:URL;
+  try{url=new URL(input);}catch{throw Error('Неверная ссылка на билет Muzaticket');}
+  const host=url.hostname.toLowerCase();
+  if(url.protocol!=='https:'||url.username||url.password||url.port||
+    !['muzaticket.ru','widget.muzaticket.ru'].includes(host))
+    throw Error('Для билетов разрешены только защищённые ссылки Muzaticket');
+  return url.href;
 }
 export function validateEvent(input:unknown):EventFields{
   if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Заполните сведения о мероприятии');
@@ -38,7 +49,7 @@ export function validateEvent(input:unknown):EventFields{
   if(!EVENT_VENUES.includes(r.venue as EventVenue))throw Error('Выберите место проведения');
   if(typeof r.description!=='string'||r.description.length>2000)throw Error('Описание не должно превышать 2000 символов');
   return {title:r.title.trim(),date:r.date,time:r.time,type:r.type as EventType,
-    venue:r.venue as EventVenue,description:r.description.trim()};
+    venue:r.venue as EventVenue,description:r.description.trim(),ticketUrl:validateTicketUrl(r.ticketUrl)};
 }
 const byDate=(a:EventPublic,b:EventPublic)=>a.date.localeCompare(b.date)||
   a.time.localeCompare(b.time)||a.title.localeCompare(b.title,'ru');
