@@ -33,7 +33,7 @@ function sameLocalPage(url, localOrigin) {
     return site.protocol === 'http:' &&
       site.hostname === '127.0.0.1' &&
       parsed.origin === site.origin &&
-      !parsed.username && !parsed.password &&
+      !parsed.username && !parsed.password && !parsed.search && !parsed.hash &&
       (parsed.pathname === '/screen' || parsed.pathname === '/editor');
   } catch { return false; }
 }
