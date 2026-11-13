@@ -8,6 +8,7 @@ import {validateEvent,type EventsRepository} from './events.js';
 import {documentStream,type DocumentRepository} from './documents.js';
 import { defaultThemeSettings,isThemeId,THEME_NAMES, VISITOR_THEME_IDS,type ThemeRepository } from './themes.js';
 import {CultureMedia,defaultCultureState,validateCulture,type CultureRepository} from './culture.js';
+import {enrichCollectivesWithSchedule} from './culture-schedule.js';
 
 export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; events?: EventsRepository; documents?: DocumentRepository; culture?: CultureRepository; cultureMedia?: CultureMedia; cookieSecure?: boolean; allowedOrigin?: string }
 const MAX_AGE_S = 8 * 60 * 60;
@@ -67,12 +68,16 @@ export function createApp(options: AppOptions) {
   app.get('/api/public/culture',async(_request,reply)=>{
     reply.header('Cache-Control','no-store');
     const state=culture?await culture.get():defaultCultureState();
-    return {content:state.published,revision:state.publishedRevision};
+    const catalog=schedule?await schedule.list():null;
+    return {content:catalog?enrichCollectivesWithSchedule(state.published,catalog.entries):state.published,revision:state.publishedRevision};
   });
   app.get('/api/editor/culture',async(request,reply)=>{
     const user=await requireRole(request,reply,['admin','editor','viewer']);if(!user)return;
     reply.header('Cache-Control','no-store');
-    return {state:culture?await culture.get():defaultCultureState()};
+    const state=culture?await culture.get():defaultCultureState();
+    const catalog=schedule?await schedule.list():null;
+    if(catalog)state.draft=enrichCollectivesWithSchedule(state.draft,catalog.entries);
+    return {state};
   });
   app.patch<{Body:{content?:unknown;expectedRevision?:number}}>('/api/editor/culture',async(request,reply)=>{
     const user=await requireRole(request,reply,['admin','editor']);if(!user)return;
