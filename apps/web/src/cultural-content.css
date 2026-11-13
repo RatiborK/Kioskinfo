@@ -190,3 +190,35 @@
   .screen-shell .visitor-documents-page .document-reading-header{padding:12px 0 15px}
   .screen-shell .visitor-documents-page .document-pdf-frame{height:clamp(440px,75vh,850px);min-height:0}
 }
+
+/* Stage 05.9.2: keep calendar rows spacious like the approved second screenshot.
+   The old flex:1 + nested overflow:auto let rows collapse on tall kiosks. */
+.screen-shell .visitor-calendar-page{
+  flex:0 0 auto;
+  overflow:visible;
+  min-height:max-content;
+}
+.screen-shell .visitor-calendar-page .cultural-calendar,
+.screen-shell .visitor-calendar-page .calendar-grid,
+.screen-shell .visitor-calendar-page .calendar-day-details{
+  flex-shrink:0;
+}
+.screen-shell .visitor-calendar-page .calendar-grid{
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  grid-template-rows:32px;
+  grid-auto-rows:minmax(114px,auto);
+  align-items:stretch;
+}
+.screen-shell .visitor-calendar-page .calendar-day{
+  min-height:114px;
+  height:100%;
+  align-self:stretch;
+}
+@media(max-width:900px){
+  .screen-shell .visitor-calendar-page .calendar-grid{grid-auto-rows:minmax(100px,auto)}
+  .screen-shell .visitor-calendar-page .calendar-day{min-height:100px}
+}
+@media(max-width:570px){
+  .screen-shell .visitor-calendar-page .calendar-grid{grid-template-rows:26px;grid-auto-rows:minmax(82px,auto)}
+  .screen-shell .visitor-calendar-page .calendar-day{min-height:82px}
+}
