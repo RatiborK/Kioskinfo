@@ -10,7 +10,7 @@ import { defaultThemeSettings,isThemeId,isHexColor,THEME_NAMES, VISITOR_THEME_ID
 import {CultureMedia,CultureVideos,MAX_CULTURE_VIDEO_BYTES,defaultCultureState,validateCulture,restoreMissingStarterContent,type CultureRepository} from './culture.js';
 import {cultureWithOptionalSchedule} from './culture-availability.js';
 
-export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; events?: EventsRepository; documents?: DocumentRepository; culture?: CultureRepository; cultureMedia?: CultureMedia; videos?: CultureVideos; cookieSecure?: boolean; allowedOrigin?: string }
+export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; events?: EventsRepository; documents?: DocumentRepository; culture?: CultureRepository; cultureMedia?: CultureMedia; videos?: CultureVideos; cookieSecure?: boolean; allowedOrigin?: string | (()=>string) }
 const MAX_AGE_S = 8 * 60 * 60;
 const ID = /^[a-z0-9_-]{1,80}$/i;
 const cookieName = (secure: boolean) => secure ? '__Host-navikultura_sid' : 'navikultura_dev_sid';
@@ -39,8 +39,9 @@ export function createApp(options: AppOptions) {
     if (!request.headers['content-type']?.startsWith(isVideoUpload?'application/octet-stream':'application/json'))
       return reply.code(415).send({error:'Неверный формат запроса'});
     const origin = request.headers.origin;
-    if (origin && allowedOrigin && origin !== allowedOrigin) return reply.code(403).send({ error: 'Источник запроса не разрешён' });
-    if (origin && !allowedOrigin) return reply.code(403).send({ error: 'Разрешённый адрес редактора не настроен' });
+    const currentAllowedOrigin=typeof allowedOrigin==='function'?allowedOrigin():allowedOrigin;
+    if (origin && currentAllowedOrigin && origin !== currentAllowedOrigin) return reply.code(403).send({ error: 'Источник запроса не разрешён' });
+    if (origin && !currentAllowedOrigin) return reply.code(403).send({ error: 'Разрешённый адрес редактора не настроен' });
   });
   async function currentUser(request: FastifyRequest): Promise<Account | null> {
     const raw = readCookie(request, cookieName(cookieSecure));
