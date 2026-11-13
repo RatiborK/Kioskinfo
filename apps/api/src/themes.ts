@@ -17,15 +17,16 @@ export function isThemeId(value:unknown):value is VisitorThemeId{
 }
 export interface ThemeSettings{
   draft:VisitorThemeId;published:VisitorThemeId;revision:number;
-  published_revision:number;updatedAt:string;
+  published_revision:number;updatedAt:string;fullscreenEnabled:boolean;
 }
 export const defaultThemeSettings=():ThemeSettings=>({
-  draft:'dk',published:'dk',revision:1,published_revision:1,updatedAt:new Date(0).toISOString(),
+  draft:'dk',published:'dk',revision:1,published_revision:1,updatedAt:new Date(0).toISOString(),fullscreenEnabled:false,
 });
 export interface ThemeRepository{
   get():Promise<ThemeSettings>;
   choose(id:VisitorThemeId,expectedRevision:number):Promise<ThemeSettings|null>;
   publish(expectedRevision:number):Promise<ThemeSettings|null>;
+  setFullscreen(enabled:boolean,expectedRevision:number):Promise<ThemeSettings|null>;
 }
 function checked(input:unknown):ThemeSettings{
   if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Повреждены настройки темы');
@@ -35,7 +36,9 @@ function checked(input:unknown):ThemeSettings{
      Number(v.published_revision)<1||Number(v.published_revision)>Number(v.revision)||
      typeof v.updatedAt!=='string'||!Number.isFinite(Date.parse(v.updatedAt)))
        throw Error('Повреждены настройки темы');
-  return v as unknown as ThemeSettings;
+  // Old installations can omit this optional persisted field.
+  if(v.fullscreenEnabled!==undefined&&typeof v.fullscreenEnabled!=='boolean')throw Error('Повреждена настройка полного экрана');
+  return {...v,fullscreenEnabled:v.fullscreenEnabled??false} as ThemeSettings;
 }
 export const defaultThemeFile=()=>fileURLToPath(new URL('../../../content/settings/visitor-theme.json',import.meta.url));
 export class FileThemeRepository implements ThemeRepository{
@@ -83,27 +86,43 @@ export class FileThemeRepository implements ThemeRepository{
       await this.write(next);return next;
     });
   }
+  async setFullscreen(enabled:boolean,expectedRevision:number){
+    if(typeof enabled!=='boolean')throw Error('Неверное значение полного экрана');
+    return this.locked(async()=>{
+      const old=await this.readStrict();
+      if(old.revision!==expectedRevision)return null;
+      const next={...old,fullscreenEnabled:enabled,revision:old.revision+1,updatedAt:new Date().toISOString()};
+      await this.write(next);return next;
+    });
+  }
 }
 // Production storage: one row, optimistic revision control, parameterised SQL.
 export class PgThemeRepository implements ThemeRepository{
   constructor(private readonly pool:pg.Pool){}
   private map(row:Record<string,unknown>):ThemeSettings{
     return checked({draft:row.draft,published:row.published,revision:Number(row.revision),
-      published_revision:Number(row.published_revision),
+      published_revision:Number(row.published_revision),fullscreenEnabled:row.fullscreen_enabled,
       updatedAt:new Date(row.updated_at as string|Date).toISOString()});
   }
   async get(){
-    const r=await this.pool.query('SELECT draft,published,revision,published_revision,updated_at FROM visitor_theme_settings WHERE id=1');
+    const r=await this.pool.query('SELECT draft,published,revision,published_revision,updated_at,fullscreen_enabled FROM visitor_theme_settings WHERE id=1');
     if(!r.rows[0])throw Error('Примените миграции базы данных для тем посетителя');
     return this.map(r.rows[0]);
   }
   async choose(id:VisitorThemeId,expectedRevision:number){
     if(!isThemeId(id))throw Error('Неизвестная тема');
-    const r=await this.pool.query(`UPDATE visitor_theme_settings SET draft=$1,revision=revision+1,updated_at=now() WHERE id=1 AND revision=$2 RETURNING draft,published,revision,published_revision,updated_at`,[id,expectedRevision]);
+    const r=await this.pool.query(`UPDATE visitor_theme_settings SET draft=$1,revision=revision+1,updated_at=now() WHERE id=1 AND revision=$2 RETURNING draft,published,revision,published_revision,updated_at,fullscreen_enabled`,[id,expectedRevision]);
     return r.rows[0]?this.map(r.rows[0]):null;
   }
   async publish(expectedRevision:number){
-    const r=await this.pool.query(`UPDATE visitor_theme_settings SET published=draft,published_revision=revision,updated_at=now() WHERE id=1 AND revision=$1 RETURNING draft,published,revision,published_revision,updated_at`,[expectedRevision]);
+    const r=await this.pool.query(`UPDATE visitor_theme_settings SET published=draft,published_revision=revision,updated_at=now() WHERE id=1 AND revision=$1 RETURNING draft,published,revision,published_revision,updated_at,fullscreen_enabled`,[expectedRevision]);
+    return r.rows[0]?this.map(r.rows[0]):null;
+  }
+  async setFullscreen(enabled:boolean,expectedRevision:number){
+    if(typeof enabled!=='boolean')throw Error('Неверное значение полного экрана');
+    const r=await this.pool.query(
+      'UPDATE visitor_theme_settings SET fullscreen_enabled=$1,revision=revision+1,updated_at=now() WHERE id=1 AND revision=$2 RETURNING draft,published,revision,published_revision,updated_at,fullscreen_enabled',
+      [enabled,expectedRevision]);
     return r.rows[0]?this.map(r.rows[0]):null;
   }
 }

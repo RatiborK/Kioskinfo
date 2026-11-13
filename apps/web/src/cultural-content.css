@@ -147,3 +147,46 @@
 .document-editor-card .secondary-button{margin-left:auto}
 @media(max-width:850px){.event-editor-layout{grid-template-columns:1fr}.documents-upload{grid-template-columns:1fr}}
 @media(max-width:550px){.event-edit-fields{grid-template-columns:1fr}}
+
+/* Stage 05.8.1 — document reader: metadata is beside, not above, the PDF.
+   Desktop: "Документы" and controls live in left column, viewer begins near top. */
+@media(min-width:1101px){
+  .screen-shell .visitor-documents-page:has(.document-reading-room){
+    display:grid;grid-template-columns:minmax(285px,31%) minmax(0,1fr);
+    column-gap:clamp(18px,2vw,34px);row-gap:12px;align-content:start;align-items:start;
+    padding-top:0;
+  }
+  .screen-shell .visitor-documents-page:has(.document-reading-room)>.schedule-header{
+    grid-column:1;grid-row:1;min-width:0;padding:0;margin:0 0 12px;
+  }
+  .screen-shell .visitor-documents-page:has(.document-reading-room)>.schedule-header h1{
+    font-size:clamp(35px,3.4vw,58px);letter-spacing:-.06em;overflow-wrap:anywhere;
+  }
+  .screen-shell .visitor-documents-page:has(.document-reading-room)>.documents-visitor,
+  .screen-shell .visitor-documents-page:has(.document-reading-room) .document-reading-room{display:contents}
+  .screen-shell .visitor-documents-page .document-reading-meta{
+    grid-column:1;grid-row:2;min-width:0;align-self:start;
+  }
+  .screen-shell .visitor-documents-page .document-pdf-frame,
+  .screen-shell .visitor-documents-page .document-paper,
+  .screen-shell .visitor-documents-page .document-loading,
+  .screen-shell .visitor-documents-page .poster-warning{
+    grid-column:2;grid-row:1 / span 3;min-width:0;margin:0;
+  }
+  .screen-shell .visitor-documents-page .document-pdf-frame{
+    width:100%;height:clamp(560px,85vh,1000px);min-height:0;
+  }
+  .screen-shell .visitor-documents-page .document-download-info{
+    grid-column:1;grid-row:3;max-width:360px;color:var(--v-muted);
+  }
+  .screen-shell .visitor-documents-page .document-reading-header{padding:18px 0 8px}
+  .screen-shell .visitor-documents-page .document-reading-header h2{font-size:clamp(27px,2.6vw,42px)}
+}
+@media(max-width:1100px){
+  .screen-shell .visitor-documents-page .document-reading-room{
+    max-width:none;margin:0;display:block;
+  }
+  .screen-shell .visitor-documents-page .document-reading-meta{margin-bottom:12px}
+  .screen-shell .visitor-documents-page .document-reading-header{padding:12px 0 15px}
+  .screen-shell .visitor-documents-page .document-pdf-frame{height:clamp(440px,75vh,850px);min-height:0}
+}

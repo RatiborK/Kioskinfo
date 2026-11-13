@@ -202,6 +202,18 @@ test('visitor theme API authenticates writes and displays only the published cho
     assert.equal(publish.statusCode,200);
     const active=await app.inject({method:'GET',url:'/api/public/theme'});
     assert.equal(active.json().theme,'holiday');
+    assert.equal(active.json().fullscreenEnabled,false);
+    const enabled=await app.inject({method:'POST',url:'/api/editor/theme/fullscreen',
+      headers:{...headers,cookie},payload:{enabled:true,expectedRevision:2}});
+    assert.equal(enabled.statusCode,200);
+    assert.equal(enabled.json().settings.fullscreenEnabled,true);
+    assert.equal((await app.inject({method:'GET',url:'/api/public/theme'})).json().fullscreenEnabled,true);
+    const stale=await app.inject({method:'POST',url:'/api/editor/theme/fullscreen',
+      headers:{...headers,cookie},payload:{enabled:false,expectedRevision:2}});
+    assert.equal(stale.statusCode,409);
+    const invalid=await app.inject({method:'POST',url:'/api/editor/theme/fullscreen',
+      headers:{...headers,cookie},payload:{enabled:'yes',expectedRevision:3}});
+    assert.equal(invalid.statusCode,400);
     assert.ok(store.events.includes('theme.select'));
     assert.ok(store.events.includes('theme.publish'));
   }finally{await app.close();await rm(dir,{recursive:true,force:true});}
@@ -221,6 +233,8 @@ test('viewer cannot select or publish theme',async()=>{
       payload:{id:'kids',expectedRevision:1}})).statusCode,403);
     assert.equal((await app.inject({method:'POST',url:'/api/editor/theme/publish',headers:{...headers,cookie},
       payload:{expectedRevision:1}})).statusCode,403);
+    assert.equal((await app.inject({method:'POST',url:'/api/editor/theme/fullscreen',
+      headers:{...headers,cookie},payload:{enabled:true,expectedRevision:1}})).statusCode,403);
   }finally{await app.close();await rm(dir,{recursive:true,force:true});}
 });
 

@@ -4,7 +4,7 @@ import { computed,onMounted,ref } from 'vue';
 import DkLogo from './DkLogo.vue';
 import KioskMenuIcon from './KioskMenuIcon.vue';
 type ThemeId='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
-type ThemeSettings={draft:ThemeId;published:ThemeId;revision:number;published_revision:number;updatedAt:string};
+type ThemeSettings={draft:ThemeId;published:ThemeId;revision:number;published_revision:number;updatedAt:string;fullscreenEnabled:boolean};
 type ThemeInfo={id:ThemeId;name:string;description:string};
 const themes:ThemeInfo[]=[
   {id:'dk',name:'Стиль сайта ДК',description:'Тёмный сине-серый фон, мягкое бирюзовое свечение, оранжевые и синие акценты'},
@@ -63,6 +63,20 @@ async function publish(){
     settings.value=data.settings;status.value='Тема опубликована. Экран посетителя обновится автоматически.';
   }catch(e){error.value=message(e);}finally{busy.value=false;}
 }
+async function saveFullscreen(enabled:boolean){
+  if(!settings.value||props.role!=='admin'||busy.value)return;
+  busy.value=true;error.value='';
+  try{
+    const data=await request<{settings:ThemeSettings}>('/api/editor/theme/fullscreen',{
+      method:'POST',headers,
+      body:JSON.stringify({enabled,expectedRevision:settings.value.revision}),
+    });
+    settings.value=data.settings;
+    status.value=enabled
+      ? 'Режим для посетителей включён. Полный экран запускается по жесту посетителя или кнопке в Edge.'
+      : 'Запрос полноэкранного режима на экране посетителя отключён.';
+  }catch(e){error.value=message(e);}finally{busy.value=false;}
+}
 onMounted(()=>{void load();});
 </script>
 <template>
@@ -100,6 +114,15 @@ onMounted(()=>{void load();});
         <div class="theme-mini-bottom"><span>Найдите нужное событие</span><span>ГДК «КИРОВСКИЙ»</span></div>
       </div>
     </div>
+    <section v-if="role==='admin'" class="visitor-kiosk-settings">
+      <h3>Режим терминала</h3>
+      <label class="visitor-kiosk-fullscreen">
+        <input type="checkbox" :checked="settings?.fullscreenEnabled??false"
+          :disabled="busy||!settings" @change="saveFullscreen(($event.target as HTMLInputElement).checked)"/>
+        <span>Предлагать полноэкранный режим на экране посетителя</span>
+      </label>
+      <p class="editor-hint">Сохраняется для всей системы. Обычный браузер не разрешает включать полноэкранный режим без действия пользователя; на экране появится кнопка, а на первом касании запускается попытка Fullscreen API. Для принудительного запуска без касания используйте Windows Edge kiosk.</p>
+    </section>
     <div class="visitor-theme-actions">
       <button v-if="role!=='viewer'" type="button" class="secondary-button" :disabled="busy||!dirty" @click="save">Сохранить выбор</button>
       <button v-if="role==='admin'" type="button" class="primary-button"
