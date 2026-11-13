@@ -214,6 +214,19 @@ test('visitor theme API authenticates writes and displays only the published cho
     const invalid=await app.inject({method:'POST',url:'/api/editor/theme/fullscreen',
       headers:{...headers,cookie},payload:{enabled:'yes',expectedRevision:3}});
     assert.equal(invalid.statusCode,400);
+    const palette=await app.inject({method:'POST',url:'/api/editor/theme/dk-colors',
+      headers:{...headers,cookie},payload:{background:'#123456',glow:'#abcdef',expectedRevision:3}});
+    assert.equal(palette.statusCode,200);
+    assert.equal(palette.json().settings.revision,4);
+    const publicColors=(await app.inject({method:'GET',url:'/api/public/theme'})).json();
+    assert.equal(publicColors.dkBackground,'#123456');
+    assert.equal(publicColors.dkGlow,'#abcdef');
+    const colorsConflict=await app.inject({method:'POST',url:'/api/editor/theme/dk-colors',
+      headers:{...headers,cookie},payload:{background:'#112233',glow:'#445566',expectedRevision:3}});
+    assert.equal(colorsConflict.statusCode,409);
+    const colorsInvalid=await app.inject({method:'POST',url:'/api/editor/theme/dk-colors',
+      headers:{...headers,cookie},payload:{background:'red;background:url(x)',glow:'#445566',expectedRevision:4}});
+    assert.equal(colorsInvalid.statusCode,400);
     assert.ok(store.events.includes('theme.select'));
     assert.ok(store.events.includes('theme.publish'));
   }finally{await app.close();await rm(dir,{recursive:true,force:true});}
@@ -235,6 +248,8 @@ test('viewer cannot select or publish theme',async()=>{
       payload:{expectedRevision:1}})).statusCode,403);
     assert.equal((await app.inject({method:'POST',url:'/api/editor/theme/fullscreen',
       headers:{...headers,cookie},payload:{enabled:true,expectedRevision:1}})).statusCode,403);
+    assert.equal((await app.inject({method:'POST',url:'/api/editor/theme/dk-colors',
+      headers:{...headers,cookie},payload:{background:'#123456',glow:'#abcdef',expectedRevision:1}})).statusCode,403);
   }finally{await app.close();await rm(dir,{recursive:true,force:true});}
 });
 
