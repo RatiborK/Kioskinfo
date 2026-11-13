@@ -32,28 +32,55 @@ const posters = ref<Poster[]>([]);
 const uploading = ref(false);
 const posterStatus = ref('');
 const posterError = ref('');
+type PosterUploadRow={name:string;size:number;status:'pending'|'uploading'|'success'|'error';message:string};
+const posterUploads=ref<PosterUploadRow[]>([]);
+const posterProgress=ref({completed:0,total:0,success:0,error:0});
 async function loadPosters(){
   try {const response=await fetch('/api/public/posters',{cache:'no-store'});if(!response.ok)throw new Error('Каталог афиш недоступен');
     const data:{posters:Poster[];ignored:number}=await response.json();posters.value=data.posters;
     posterStatus.value=`Найдено афиш: ${data.posters.length}`+(data.ignored?`. Пропущено файлов: ${data.ignored}`:'');
   }catch(e){posterError.value=String(e instanceof Error?e.message:e);}
 }
-function readBase64(file:File):Promise<string>{return new Promise((resolve,reject)=>{
-  const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');
-  reader.onerror=()=>reject(new Error('Не удалось прочитать файл'));
-  reader.readAsDataURL(file);
-});}
+// One binary POST for each file; a failure is recorded and the batch continues.
 async function uploadPosters(event:Event){
   const input=event.target as HTMLInputElement;
-  const files=Array.from(input.files||[]);if(!files.length)return;
+  const files=Array.from(input.files??[]);
+  if(!files.length||uploading.value)return;
   uploading.value=true;posterError.value='';
-  try {for(const file of files){
-    if(file.size>8*1024*1024)throw new Error(`${file.name}: файл больше 8 МБ`);
-    const base64=await readBase64(file);
-    await api('/api/editor/posters',{method:'POST',headers,body:JSON.stringify({name:file.name,base64})});
-  } await loadPosters();posterStatus.value=`Загружено: ${files.length}. Терминалы обновятся автоматически.`;
-  }catch(e){posterError.value=String(e instanceof Error?e.message:e);await loadPosters();}
-  finally{uploading.value=false;input.value='';}
+  posterUploads.value=files.map(file=>({name:file.name,size:file.size,status:'pending',message:'В очереди'}));
+  posterProgress.value={completed:0,total:files.length,success:0,error:0};
+  try{
+    for(const [index,file] of files.entries()){
+      posterUploads.value[index]={...posterUploads.value[index],status:'uploading',message:'Загружается…'};
+      try{
+        if(file.size===0||file.size>20*1024*1024)
+          throw Error('Допустимый размер изображения: до 20 МиБ');
+        if(!/\.(?:jpe?g|png|webp|gif|avif|bmp)$/i.test(file.name))
+          throw Error('Допустимые форматы: JPG, PNG, WebP, GIF, AVIF, BMP');
+        await api('/api/editor/posters/upload',{
+          method:'POST',
+          headers:{'Content-Type':'application/octet-stream',
+            'X-Navikultura-Action':'1',
+            'X-Navikultura-File-Name':encodeURIComponent(file.name)},
+          body:file,
+        });
+        posterUploads.value[index]={...posterUploads.value[index],status:'success',message:'Добавлена'};
+        posterProgress.value.success++;
+      }catch(error){
+        const message=error instanceof Error?error.message:String(error);
+        posterUploads.value[index]={...posterUploads.value[index],status:'error',message};
+        posterProgress.value.error++;
+      }finally{
+        posterProgress.value.completed++;
+      }
+    }
+    posterStatus.value=`Обработано: ${posterProgress.value.completed}/${files.length}. Добавлено: ${posterProgress.value.success}. Ошибок: ${posterProgress.value.error}.`;
+    if(posterProgress.value.error)posterError.value='Некоторые афиши не загрузились. Причины указаны напротив каждого файла.';
+    try{await loadPosters();}
+    catch(error){posterError.value+=' Не удалось обновить каталог: '+String(error);}
+  }finally{
+    uploading.value=false;input.value='';
+  }
 }
 async function removePoster(item:Poster){
   if(!window.confirm(`Удалить афишу «${item.title}»?`))return;
@@ -275,11 +302,22 @@ onBeforeUnmount(()=>{
       <section class="editor-panel poster-editor">
         <div class="poster-editor-top"><div><span class="eyebrow">АВТОМАТИЧЕСКИЙ КАТАЛОГ</span><h2>Афиши и медиаматериалы</h2></div><button type="button" class="secondary-button" @click="loadPosters">Обновить список</button></div>
         <p class="editor-hint">Добавь изображение в браузере или скопируй его в папку <code>content/posters</code> проекта. При добавлении и удалении файлов экран обновится автоматически.</p>
-        <label v-if="user.role!=='viewer'" class="poster-upload">Добавить афиши (JPG, PNG, WebP до 8 МБ)
-          <input type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple :disabled="uploading" @change="uploadPosters" />
+        <label v-if="user.role!=='viewer'" class="poster-upload">Добавить афиши (JPG, PNG, WebP, GIF, AVIF, BMP до 20 МиБ)
+          <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif,.avif,.bmp,image/jpeg,image/png,image/webp,image/gif,image/avif,image/bmp" multiple :disabled="uploading" @change="uploadPosters" />
         </label>
         <p class="status-line" role="status">{{uploading?'Загрузка…':posterStatus}}</p>
         <p v-if="posterError" class="editor-error" role="alert">{{posterError}}</p>
+        <div v-if="posterUploads.length" class="poster-upload-report" aria-label="Результаты загрузки афиш">
+          <strong>Файлы: {{posterProgress.completed}} / {{posterProgress.total}} · Успешно: {{posterProgress.success}} · Ошибок: {{posterProgress.error}}</strong>
+          <div class="poster-upload-report-list">
+            <div v-for="(item,index) in posterUploads" :key="index" class="poster-upload-report-row"
+              :class="'poster-upload-'+item.status">
+              <span class="poster-upload-filename">{{item.name}}</span>
+              <span class="poster-upload-filesize">{{(item.size/1024/1024).toFixed(2)}} МиБ</span>
+              <span class="poster-upload-file-status" :role="item.status==='error'?'alert':undefined">{{item.message}}</span>
+            </div>
+          </div>
+        </div>
         <div class="poster-editor-list" v-if="posters.length">
           <div v-for="poster in posters" :key="poster.name" class="poster-editor-row">
             <img v-if="poster.kind==='image'" :src="poster.url" :alt="poster.title" loading="lazy" />

@@ -131,6 +131,34 @@ test('admin can upload and delete a verified poster, viewer cannot',async()=>{
   }finally{await admin.app.close();await rm(dir,{recursive:true,force:true});}
 });
 
+test('each binary poster upload has an independent HTTP response and the next file succeeds',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-binary-posters-'));
+  const repo=new FolderPosterRepository(dir);
+  const {app,cookie}=await fixture('admin',repo);
+  const photo=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jXjoAAAAASUVORK5CYII=','base64');
+  const uploadHeaders={cookie,'x-navikultura-action':'1','content-type':'application/octet-stream'};
+  try{
+    const invalid=await app.inject({method:'POST',url:'/api/editor/posters/upload',
+      headers:{...uploadHeaders,'x-navikultura-file-name':encodeURIComponent('Поврежденный.jpg')},
+      payload:Buffer.from('not-a-real-jpeg')});
+    assert.equal(invalid.statusCode,400);
+    const good=await app.inject({method:'POST',url:'/api/editor/posters/upload',
+      headers:{...uploadHeaders,'x-navikultura-file-name':encodeURIComponent('Новая_афиша.png')},
+      payload:photo});
+    assert.equal(good.statusCode,201,good.body);
+    assert.equal((await repo.list()).posters.length,1);
+    const unauth=await app.inject({method:'POST',url:'/api/editor/posters/upload',
+      headers:{'x-navikultura-action':'1','content-type':'application/octet-stream',
+        'x-navikultura-file-name':'secret.png'},payload:photo});
+    assert.equal(unauth.statusCode,401);
+    const tooLarge=Buffer.alloc(20*1024*1024+1);photo.copy(tooLarge);
+    const refused=await app.inject({method:'POST',url:'/api/editor/posters/upload',
+      headers:{...uploadHeaders,'x-navikultura-file-name':'huge.png'},payload:tooLarge});
+    assert.equal(refused.statusCode,413);
+    assert.equal((await repo.list()).posters.length,1);
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
+});
+
 test('schedule API rejects guests, hides drafts, and publishes only authorized updates',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'navikultura-schedule-api-'));
   try{

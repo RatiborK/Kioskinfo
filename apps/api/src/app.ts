@@ -2,7 +2,7 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import { createSessionToken, tokenHash, verifyPassword } from './crypto.js';
 import type { Account, PublicContent, Store } from './model.js';
-import { posterFileStream, type PosterRepository } from './posters.js';
+import { posterFileStream, MAX_POSTER_UPLOAD_BYTES, type PosterRepository } from './posters.js';
 import { validateScheduleFields, type ScheduleRepository } from './schedule.js';
 import {validateEvent,type EventsRepository} from './events.js';
 import {documentStream,type DocumentRepository} from './documents.js';
@@ -35,8 +35,9 @@ export function createApp(options: AppOptions) {
     if (!mutating.has(request.method)) return;
     // JSON + a custom header and SameSite=Strict protect against ordinary cross-site form submissions.
     if (request.headers['x-navikultura-action'] !== '1') return reply.code(403).send({ error: 'Необходим заголовок X-Navikultura-Action' });
-    const isVideoUpload=request.url==='/api/editor/culture/video'&&request.method==='POST';
-    if (!request.headers['content-type']?.startsWith(isVideoUpload?'application/octet-stream':'application/json'))
+    const isBinaryUpload=request.method==='POST' &&
+      (request.url==='/api/editor/culture/video' || request.url==='/api/editor/posters/upload');
+    if (!request.headers['content-type']?.startsWith(isBinaryUpload?'application/octet-stream':'application/json'))
       return reply.code(415).send({error:'Неверный формат запроса'});
     const origin = request.headers.origin;
     const currentAllowedOrigin=typeof allowedOrigin==='function'?allowedOrigin():allowedOrigin;
@@ -403,6 +404,27 @@ export function createApp(options: AppOptions) {
     reply.header('Content-Length', media.sizeBytes);
     return reply.send(posterFileStream(media.filePath));
   });
+  // Binary upload avoids Base64 overhead, especially for 20 MiB images.
+  // Every request represents exactly one file. A failed request never blocks the next.
+  app.post<{Body:Buffer}>('/api/editor/posters/upload',
+    {bodyLimit:MAX_POSTER_UPLOAD_BYTES},async(request,reply)=>{
+      const account=await requireRole(request,reply,['admin','editor']);
+      if(!account)return;
+      if(!posters)return reply.code(503).send({error:'Папка афиш не настроена'});
+      let filename='';
+      try{filename=decodeURIComponent(String(request.headers['x-navikultura-file-name']??''));}
+      catch{return reply.code(400).send({error:'Некорректное имя файла'});}
+      try{
+        const item=await posters.uploadBytes(filename,request.body);
+        await store.audit(account.id,'poster.upload',{name:item.name,bytes:item.sizeBytes});
+        return reply.code(201).send({poster:item});
+      }catch(error){
+        if(error instanceof Error&&['INVALID_FILENAME','INVALID_MEDIA','UPLOAD_IMAGE_ONLY'].includes(error.message))
+          return reply.code(400).send({error:'Нужен корректный JPG, PNG, WebP, GIF, AVIF или BMP размером до 20 МиБ'});
+        request.log.error({error},'poster upload failed');
+        return reply.code(500).send({error:'Не удалось записать афишу в хранилище. Проверьте место на диске и права доступа'});
+      }
+    });
   app.post<{ Body: { name?: string; base64?: string } }>('/api/editor/posters', async (request, reply) => {
     const account = await requireRole(request, reply, ['admin','editor']);
     if (!account) return;
@@ -415,7 +437,7 @@ export function createApp(options: AppOptions) {
       return reply.code(201).send({ poster: item });
     } catch (error) {
       if (error instanceof Error && ['INVALID_FILENAME','INVALID_MEDIA','UPLOAD_IMAGE_ONLY'].includes(error.message))
-        return reply.code(400).send({ error: 'Нужен корректный JPG, PNG или WebP размером до 8 МБ' });
+        return reply.code(400).send({ error: 'Нужен корректный JPG, PNG, WebP, GIF, AVIF или BMP размером до 20 МиБ' });
       throw error;
     }
   });

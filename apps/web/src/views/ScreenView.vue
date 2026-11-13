@@ -34,6 +34,35 @@ const route=useRoute();
 const initial=route.query.section;
 const current=ref<Section>(items.some(x=>x.id===initial)?initial as Section:'posters');
 const scrollRegion=ref<HTMLElement|null>(null);
+const scrollCueVisible=ref(false);
+let scrollCueTimer:ReturnType<typeof setInterval>|undefined;
+// Support the main visitor scroller and legacy nested scroll areas.
+function activeScrollHost():HTMLElement|null {
+  const root=scrollRegion.value;
+  if(!root)return null;
+  if(root.scrollHeight>root.clientHeight+32)return root;
+  const selectors='.schedule-section,.culture-section,.floor-navigation-viewport,.documents-visitor,.document-pdf-frame';
+  for(const element of Array.from(root.querySelectorAll<HTMLElement>(selectors))){
+    if(element.scrollHeight>element.clientHeight+32 &&
+       /auto|scroll/.test(getComputedStyle(element).overflowY))return element;
+  }
+  return root;
+}
+function updateScrollCue(){
+  if(current.value==='posters'||ticketOpen.value||globalSearchOpen.value||activeVideo.value){
+    scrollCueVisible.value=false;return;
+  }
+  const host=activeScrollHost();
+  scrollCueVisible.value=!!host && host.scrollHeight-host.clientHeight-host.scrollTop>48;
+}
+function scrollMore(){
+  const host=activeScrollHost();
+  if(!host)return;
+  const motion=window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth';
+  host.scrollBy({top:Math.max(240,Math.floor(host.clientHeight*.75)),behavior:motion});
+  activity();
+}
+
 const culture=ref<CultureContent|null>(null);
 const cultureError=ref('');
 const events=ref<PublicEvent[]>([]);
@@ -109,6 +138,7 @@ function onEnter(){
   }else{
     document.querySelector<HTMLElement>('.screen-content [data-page-title]')?.focus({preventScroll:true});
   }
+  void nextTick(updateScrollCue);
 }
 function openSearch(){activity();searchKeyboardRequested.value=false;globalSearchOpen.value=true;}
 function openKeyboard(){activity();searchKeyboardRequested.value=true;globalSearchOpen.value=true;}
@@ -225,6 +255,9 @@ onMounted(async()=>{
   slideTimer=setInterval(()=>{if(current.value==='posters'&&!ticketOpen.value&&activePoster.value?.kind!=='video'&&
     Date.now()-lastManualPoster>12000)movePoster(1,false);},8000);
   inactivityTimer=setInterval(resetIdle,12000);
+  scrollCueTimer=setInterval(updateScrollCue,1200);
+  window.addEventListener('resize',updateScrollCue);
+  void nextTick(updateScrollCue);
   window.addEventListener('pointerdown',activity,{passive:true});
   window.addEventListener('pointerdown',fullscreenOnGesture,{capture:true,passive:true});
   document.addEventListener('fullscreenchange',syncFullscreen);
@@ -236,6 +269,8 @@ onBeforeUnmount(()=>{
   if(refreshTimer)clearInterval(refreshTimer);
   if(slideTimer)clearInterval(slideTimer);
   if(inactivityTimer)clearInterval(inactivityTimer);
+  if(scrollCueTimer)clearInterval(scrollCueTimer);
+  window.removeEventListener('resize',updateScrollCue);
   window.removeEventListener('pointerdown',activity);
   window.removeEventListener('pointerdown',fullscreenOnGesture,true);
   document.removeEventListener('fullscreenchange',syncFullscreen);
@@ -247,7 +282,8 @@ onBeforeUnmount(()=>{
   <main class="shell screen-shell" :class="{'kiosk-home':current==='posters'}" :data-visitor-theme="visitorTheme" :style="dkStyle">
     <Transition name="kiosk-page" mode="out-in" @after-enter="onEnter">
       <div :key="current" ref="scrollRegion" class="screen-content" :class="{'screen-poster-page':current==='posters'}"
-        @pointerdown="sectionTouchDown" @pointerup="sectionTouchUp" @pointercancel="sectionTouchCancel">
+        @pointerdown="sectionTouchDown" @pointerup="sectionTouchUp" @pointercancel="sectionTouchCancel"
+        @scroll.capture="updateScrollCue">
         <header class="brand-row">
           <DkLogo class="kiosk-dk-logo"/>
           <button v-if="fullscreenEnabled&&!fullscreenActive&&!nativeFullscreenShell" type="button"
@@ -346,6 +382,13 @@ onBeforeUnmount(()=>{
         </footer>
       </div>
     </Transition>
+    <button v-if="scrollCueVisible" type="button" class="kiosk-scroll-cue"
+      aria-label="Ниже есть информация. Прокрутить страницу вниз" title="Листайте вниз"
+      @click="scrollMore">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+        stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"
+        aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg>
+    </button>
     <nav class="side-menu" aria-label="Разделы информационной системы">
       <span class="menu-title">НАВИГАЦИЯ / РАЗДЕЛЫ</span>
       <button v-for="(item,index) in items" :key="item.id" type="button" class="nav-item"
