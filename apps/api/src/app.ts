@@ -8,7 +8,7 @@ import {validateEvent,type EventsRepository} from './events.js';
 import {documentStream,type DocumentRepository} from './documents.js';
 import { defaultThemeSettings,isThemeId,THEME_NAMES, VISITOR_THEME_IDS,type ThemeRepository } from './themes.js';
 import {CultureMedia,defaultCultureState,validateCulture,type CultureRepository} from './culture.js';
-import {enrichCollectivesWithSchedule} from './culture-schedule.js';
+import {cultureWithOptionalSchedule} from './culture-availability.js';
 
 export interface AppOptions { store: Store; posters?: PosterRepository; schedule?: ScheduleRepository; themes?: ThemeRepository; events?: EventsRepository; documents?: DocumentRepository; culture?: CultureRepository; cultureMedia?: CultureMedia; cookieSecure?: boolean; allowedOrigin?: string }
 const MAX_AGE_S = 8 * 60 * 60;
@@ -55,7 +55,7 @@ export function createApp(options: AppOptions) {
   app.get('/api/health', async () => ({ status: 'ok', service: 'navikultura-api', phase: 'stage-01' }));
   app.get('/api/public/navigation', async () => ({
     status: 'demo', sections: [
-      { id: 'posters', title: 'Афиша' }, { id: 'schedule', title: 'Расписание' },
+      { id: 'posters', title: 'Афиша' },
       { id: 'groups', title: 'Коллективы' }, {id:'calendar',title:'Календарь событий'}, {id:'documents',title:'Документы ДК'}, { id: 'navigation', title: 'Навигация' },
       { id: 'about', title: 'О ДК' }, { id: 'safety', title: 'Безопасность' }, { id: 'tickets', title: 'Билеты' }, { id: 'contacts', title: 'Контакты' },
     ],
@@ -68,15 +68,16 @@ export function createApp(options: AppOptions) {
   app.get('/api/public/culture',async(_request,reply)=>{
     reply.header('Cache-Control','no-store');
     const state=culture?await culture.get():defaultCultureState();
-    const catalog=schedule?await schedule.list():null;
-    return {content:catalog?enrichCollectivesWithSchedule(state.published,catalog.entries):state.published,revision:state.publishedRevision};
+    const published=await cultureWithOptionalSchedule(state.published,schedule,()=>{});
+    return {content:published,revision:state.publishedRevision};
   });
   app.get('/api/editor/culture',async(request,reply)=>{
     const user=await requireRole(request,reply,['admin','editor','viewer']);if(!user)return;
     reply.header('Cache-Control','no-store');
     const state=culture?await culture.get():defaultCultureState();
-    const catalog=schedule?await schedule.list():null;
-    if(catalog)state.draft=enrichCollectivesWithSchedule(state.draft,catalog.entries);
+    // Old schedule is optional: a broken/retired schedule must never hide the whole editor.
+    // Published/draft catalogs remain authoritative; legacy fields are a read-only enrichment.
+    state.draft=await cultureWithOptionalSchedule(state.draft,schedule,()=>{});
     return {state};
   });
   app.patch<{Body:{content?:unknown;expectedRevision?:number}}>('/api/editor/culture',async(request,reply)=>{
