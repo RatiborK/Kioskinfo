@@ -2,7 +2,7 @@
 <script setup lang="ts">
 import {computed,ref,watch} from 'vue';
 import type {CultureNavigation,CultureFloor,FloorPoint} from '../utils/culture-types.js';
-const props=withDefaults(defineProps<{navigation:CultureNavigation;editable?:boolean}>(),{editable:false});
+const props=withDefaults(defineProps<{navigation:CultureNavigation;editable?:boolean;initialFloor?:string;initialPoint?:string}>(),{editable:false});
 const emit=defineEmits<{(e:'add-point',value:{floorId:string;x:number;y:number}):void;
   (e:'select-point',value:{floorId:string;id:string}):void}>();
 const floorId=ref('floor-1'),selectedPoint=ref(''),zoom=ref(1),category=ref('all');
@@ -24,6 +24,12 @@ function addPoint(event:MouseEvent){
 }
 function setZoom(delta:number){zoom.value=Math.max(1,Math.min(2.5,Math.round((zoom.value+delta)*10)/10));}
 watch(()=>props.navigation.floors,()=>{if(!props.navigation.floors.some(x=>x.id===floorId.value))floorId.value='floor-1';});
+watch(()=>[props.initialFloor,props.initialPoint] as const,([target,point])=>{
+  if(target&&props.navigation.floors.some(f=>f.id===target)){
+    floorId.value=target;zoom.value=1;
+    selectedPoint.value=point&&props.navigation.floors.find(f=>f.id===target)?.points.some(x=>x.id===point)?point:'';
+  }
+},{immediate:true});
 defineExpose({chooseFloor,choosePoint});
 </script>
 <template>
