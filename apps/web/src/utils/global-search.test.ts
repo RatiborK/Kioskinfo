@@ -4,6 +4,13 @@ import {test} from 'node:test';
 import {searchKiosk} from './global-search.ts';
 import type {CultureContent} from './culture-types.js';
 const sample:CultureContent={
+ navigation:{title:'План ДК',intro:'',notice:'',floors:[
+  {id:'floor-1',title:'Первый этаж',note:'Основной уровень',points:[
+  {id:'dance-studio',title:'Кабинет 39',kind:'studio',x:36,y:44,description:'Танцевальная студия'}
+ ]},
+  {id:'floor-2',title:'Верхний уровень',note:'',points:[]},
+  {id:'floor-3',title:'Знаки',note:'',points:[]},
+ ]},
  about:{title:'Дворец культуры Кировский',intro:'История учреждения',facts:[],history:[],videoUrl:'',photo:'',photoCredit:'',sourceUrl:''},
  safety:{title:'Безопасность',intro:'',notice:'',sections:[
   {id:'bullying',title:'Профилактика буллинга',subtitle:'Безопасная среда',icon:'family',paragraphs:['Просите помощи у взрослых']}
@@ -21,7 +28,8 @@ const data={culture:sample,events:[{id:'event1',title:'Концерт',date:'202
  posters:[{name:'poster.jpg',title:'Новогодняя афиша'}]};
 test('search indexes the entire kiosk without requiring a schedule page',()=>{
  assert.deepEqual(searchKiosk(data,'Марина').map(x=>x.id),['rainbow']);
- assert.deepEqual(searchKiosk(data,'кабинет 39').map(x=>x.id),['rainbow']);
+ assert.ok(searchKiosk(data,'кабинет 39').some(x=>x.id==='rainbow'));
+ assert.ok(searchKiosk(data,'кабинет 39').some(x=>x.id==='dance-studio'))
  assert.deepEqual(searchKiosk(data,'буллинг').map(x=>x.id),['bullying']);
  assert.deepEqual(searchKiosk(data,'прейскурант').map(x=>x.id),['doc1']);
  assert.deepEqual(searchKiosk(data,'новогодняя').map(x=>x.id),['event1','poster.jpg']);
@@ -32,4 +40,7 @@ test('query matching is case and ё/е insensitive with multiple words',()=>{
  assert.deepEqual(searchKiosk(data,'ДВОРЕЦ КУЛЬТУРЫ').map(x=>x.section),['about']);
  assert.deepEqual(searchKiosk(data,'кружок РАДУГА').map(x=>x.id),['rainbow']);
  assert.deepEqual(searchKiosk(data,'неизвестно'),[]);
+ assert.ok(searchKiosk(data,'первый этаж').some(x=>x.id==='floor-1'))
+ assert.ok(searchKiosk(data,'танцевальная студия').some(x=>x.id==='dance-studio'&&x.floorId==='floor-1'));
+
 });

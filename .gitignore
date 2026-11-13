@@ -21,3 +21,8 @@ backups/
 *.sqlite3
 *.db
 *.backup.sql
+
+# Stage 05.6: original Visio/pamphlet media is a locally installed asset bundle.
+# The source is separately distributed; do not accidentally commit office floor plans.
+apps/web/public/assets/navigation/*.webp
+apps/web/public/assets/safety/*.webp

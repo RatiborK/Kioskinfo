@@ -96,7 +96,7 @@ test('Stage 05.4 safety upgrade preserves employee text while adding prevention 
   previous.safety.notice='Утверждено ответственным лицом';
   previous.tickets.url='https://gorodsobitiy.ru/venues/dk-kirovsky';
   const next=enrichLegacySafety(previous);
-  assert.equal(next.safety.sections.length,15);
+  assert.equal(next.safety.sections.length,17);
   assert.ok(next.safety.sections.some(section=>section.id==='bullying'));
   assert.ok(next.safety.sections.some(section=>section.id==='corruption'));
   assert.equal(next.safety.sections.find(x=>x.id==='fire')?.paragraphs[0],'Авторизованный текст');
@@ -105,4 +105,30 @@ test('Stage 05.4 safety upgrade preserves employee text while adding prevention 
   assert.match(next.tickets.url,/muzaticket\.ru\/iframe/);
   assert.equal(previous.safety.sections.length,6);
   assert.doesNotThrow(()=>validateCulture(next));
+});
+
+test('navigation keeps original supplied floor sources and rejects invented map ids or positions',()=>{
+ const catalog=defaultCultureState().draft;
+ assert.equal(catalog.navigation.floors.length,3);
+ assert.equal(catalog.navigation.floors[0].title,'Первый этаж');
+ assert.equal(catalog.navigation.floors[0].points.length,0);
+ const edited=structuredClone(catalog);
+ edited.navigation.floors[0].points.push({
+   id:'test-hall',title:'Тестовый зал',kind:'hall',x:54.3,y:61.2,description:'Подтверждается сотрудником'
+ });
+ const checked=validateCulture(edited);
+ assert.equal(checked.navigation.floors[0].points[0].x,54.3);
+ assert.throws(()=>validateCulture({...edited,navigation:{...edited.navigation,
+   floors:edited.navigation.floors.map((f,i)=>i===0?{...f,points:[{...f.points[0],x:-1}]}:f)}}),/Координаты/);
+ assert.throws(()=>validateCulture({...edited,navigation:{...edited.navigation,
+   floors:edited.navigation.floors.map((f,i)=>i===0?{...f,id:'unknown-plan'}:f)}}),/схема/);
+ assert.throws(()=>validateCulture({...edited,navigation:{...edited.navigation,
+   floors:edited.navigation.floors.map((f,i)=>i===0?{...f,points:[f.points[0],f.points[0]]}:f)}}),/Повторяются/);
+});
+test('pre-navigation revisions are upgraded without destroying employee content',()=>{
+ const old=structuredClone(defaultCultureState().draft) as unknown as Record<string,unknown>;
+ delete old.navigation;
+ const result=validateCulture(old);
+ assert.equal(result.navigation.floors.length,3);
+ assert.equal(result.collectives.length,defaultCultureState().draft.collectives.length);
 });

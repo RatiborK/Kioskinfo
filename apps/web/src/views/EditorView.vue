@@ -6,6 +6,7 @@ import VisitorThemeEditor from '../components/VisitorThemeEditor.vue';
 import EventEditor from '../components/EventEditor.vue';
 import DocumentEditor from '../components/DocumentEditor.vue';
 import CultureEditor from '../components/CultureEditor.vue';
+import KioskKeyboard from '../components/KioskKeyboard.vue';
 type Role = 'admin' | 'editor' | 'viewer';
 type Account = {id:string; username:string; displayName:string; role:Role};
 type Page = {id:string;slug:string;title:string;body:string;revision:number;published_revision:number|null};
@@ -62,6 +63,15 @@ async function removePoster(item:Poster){
 }
 const user = ref<Account|null>(null);
 const username = ref(''); const password = ref('');
+const loginKeyboard=ref(false),loginKeyboardTarget=ref<'username'|'password'>('username');
+function editCredential(value:string){
+  if(loginKeyboardTarget.value==='username')username.value=value;
+  else password.value=value;
+}
+function toggleLoginKeyboard(target:'username'|'password'){
+  if(loginKeyboard.value&&loginKeyboardTarget.value===target){loginKeyboard.value=false;return;}
+  loginKeyboardTarget.value=target;loginKeyboard.value=true;
+}
 const pages = ref<Page[]>([]); const selectedId = ref('');
 const title = ref(''); const body = ref(''); const revision = ref(0);
 const status = ref('Подключение…'); const busy = ref(false); const error = ref('');
@@ -198,8 +208,21 @@ onBeforeUnmount(()=>{
     </header>
     <section v-if="!user" class="editor-panel login-panel">
       <h2>Вход в систему</h2><p class="editor-hint">Редактирование доступно только сотрудникам с учётной записью.</p>
-      <form @submit.prevent="login"><label>Логин<input v-model="username" autocomplete="username" required maxlength="80" /></label>
-        <label>Пароль<input v-model="password" type="password" autocomplete="current-password" required /></label>
+      <form @submit.prevent="login"><label>Логин<input v-model="username" autocomplete="username" required maxlength="80"
+          @focus="loginKeyboardTarget='username'"/></label>
+        <label>Пароль<input v-model="password" type="password" autocomplete="current-password" required
+          @focus="loginKeyboardTarget='password'"/></label>
+        <div class="login-keyboard-bar">
+          <button type="button" class="secondary-button" :aria-expanded="loginKeyboard"
+            @click="toggleLoginKeyboard('username')">⌨ Логин</button>
+          <button type="button" class="secondary-button" :aria-expanded="loginKeyboard"
+            @click="toggleLoginKeyboard('password')">⌨ Пароль</button>
+        </div>
+        <div v-if="loginKeyboard" class="login-touch-keyboard">
+          <p>Экранная клавиатура — {{loginKeyboardTarget==='username'?'логин':'пароль'}}</p>
+          <KioskKeyboard :model-value="loginKeyboardTarget==='username'?username:password"
+            @update:model-value="editCredential" @close="loginKeyboard=false"/>
+        </div>
         <button class="primary-button" :disabled="busy" type="submit">Войти</button>
       </form>
       <p v-if="error" class="editor-error" role="alert">{{error}}</p>

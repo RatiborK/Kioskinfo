@@ -1,6 +1,7 @@
 // apps/api/src/index-preview.ts — local-only development editor with ephemeral password.
 // Never expose port 3100 or Vite to the LAN in this mode. Schedule data persists to content/schedule/records.json.
 import { randomBytes, randomUUID } from 'node:crypto';
+import {fileURLToPath} from 'node:url';
 import { createApp } from './app.js';
 import { FolderPosterRepository } from './posters.js';
 import { FileScheduleRepository } from './schedule-file.js';
@@ -32,8 +33,15 @@ class LocalDevStore implements Store {
     row.published={title:row.title,body:row.body};row.published_revision=row.revision;return structuredClone(row);}
   async audit(_accountId:string|null,_action:string,_details:Record<string,unknown>){}
 }
-const password=process.env.NAVIKULTURA_DEV_PASSWORD || randomBytes(18).toString('base64url');
-if(password.length<12)throw new Error('NAVIKULTURA_DEV_PASSWORD: требуется не менее 12 символов');
+// Local preview ONLY. Read the ignored .env.local file created by the operator;
+// never commit the password, return it to the browser, or print the configured value.
+try{process.loadEnvFile(fileURLToPath(new URL('../../../.env.local',import.meta.url)));}
+catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
+const configuredPassword=process.env.NAVIKULTURA_DEV_PASSWORD;
+const password=configuredPassword || randomBytes(18).toString('base64url');
+if(password.length<8)throw new Error('NAVIKULTURA_DEV_PASSWORD: минимум 8 символов только для локального просмотра');
+if(configuredPassword&&password.length<12)
+  process.stderr.write('[NAVIKULTURA DEV] Короткий пароль разрешён только на 127.0.0.1. Для эксплуатации требуется другой, более сильный пароль.\n');
 const store=new LocalDevStore(await hashPassword(password));
 const scheduleRepo=new FileScheduleRepository();
 const importedCards=await seedPreviewSchedule(scheduleRepo);
@@ -41,7 +49,7 @@ const app=createApp({store,posters:new FolderPosterRepository(),schedule:schedul
 try {
   await app.listen({host:'127.0.0.1',port:3100});
   process.stdout.write('\n[LOCAL DEV ONLY] НавиКультура: http://127.0.0.1:5173/editor\n');
-  process.stdout.write('Логин: admin\nПароль для текущего запуска: '+password+'\n');
+  process.stdout.write('Логин: admin\n'+(configuredPassword?'Пароль загружен из локальной .env.local, в журнал не выводится.\n':'Временный пароль для первого локального запуска: '+password+'\n'));
   process.stdout.write('Каталог расписания: content/schedule/records.json. Добавлено начальных карточек: '+importedCards+'. Этот режим НЕ для локальной сети ДК.\n\n');
 } catch(error) {
   const detail = error instanceof Error ? error.message : String(error);

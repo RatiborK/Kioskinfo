@@ -14,12 +14,16 @@ export type CultureCollective={
   programs:string[];description:string;history:string;photo:string;videoUrl:string;source:string;sourcePage:number;
 };
 export type SafetySection={id:string;title:string;subtitle:string;icon:string;paragraphs:string[]};
+export type FloorPoint={id:string;title:string;kind:'hall'|'studio'|'service'|'stairs'|'exit'|'other';x:number;y:number;description:string};
+export type CultureFloor={id:string;title:string;note:string;points:FloorPoint[]};
+export type CultureNavigation={title:string;intro:string;notice:string;floors:CultureFloor[]};
 export type CultureContent={
   about:{title:string;intro:string;facts:string[];history:string[];videoUrl:string;photo:string;photoCredit:string;sourceUrl:string};
   safety:{title:string;intro:string;sections:SafetySection[];notice:string};
   tickets:{title:string;intro:string;url:string;note:string};
   contact:{address:string;phone:string;clubsPhone:string;eventsPhone:string;email:string;hours:string;website:string};
   categories:CultureCategory[];leaders:CultureLeader[];collectives:CultureCollective[];
+  navigation:CultureNavigation;
 };
 export type CultureState={revision:number;publishedRevision:number;draft:CultureContent;published:CultureContent;updatedAt:string};
 export interface CultureRepository{
@@ -79,7 +83,7 @@ function unique(items:{id:string}[],what:string){
 export function validateCulture(value:unknown):CultureContent {
   const root=asObject(value);
   const a=asObject(root.about),s=asObject(root.safety),t=asObject(root.tickets),contact=asObject(root.contact);
-  if(!Array.isArray(s.sections)||s.sections.length>15)throw Error('Слишком много разделов безопасности');
+  if(!Array.isArray(s.sections)||s.sections.length>25)throw Error('Слишком много разделов безопасности');
   const sections:SafetySection[]=s.sections.map(item=>{
     const v=asObject(item);
     return {id:id(v.id),title:string(v.title,120),subtitle:string(v.subtitle,180),
@@ -112,6 +116,25 @@ export function validateCulture(value:unknown):CultureContent {
       videoUrl:videoUrl(v.videoUrl),source:string(v.source,250),sourcePage:page};
   });
   unique(collectives,'коллективы');
+  const n=asObject(root.navigation??starterContent.navigation);
+  if(!Array.isArray(n.floors)||n.floors.length!==3)throw Error('Ожидались три схемы ДК');
+  const floorIds=['floor-1','floor-2','floor-3'];
+  const floors:CultureFloor[]=n.floors.map((item,index)=>{
+    const f=asObject(item),floorId=id(f.id);
+    if(floorId!==floorIds[index])throw Error('Неизвестная схема или порядок этажей');
+    if(!Array.isArray(f.points)||f.points.length>80)throw Error('Слишком много отметок на плане');
+    const points:FloorPoint[]=f.points.map(raw=>{
+      const p=asObject(raw),kind=string(p.kind,20);
+      if(!['hall','studio','service','stairs','exit','other'].includes(kind))throw Error('Неизвестный тип помещения');
+      const x=Number(p.x),y=Number(p.y);
+      if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||x>100||y<0||y>100)
+        throw Error('Координаты должны быть от 0 до 100');
+      return {id:id(p.id),title:string(p.title,110),kind:kind as FloorPoint['kind'],x,y,
+        description:string(p.description,1000)};
+    });
+    unique(points,'отметки на этаже');
+    return {id:floorId,title:string(f.title,100),note:string(f.note,260),points};
+  });
   const data:CultureContent={
     about:{title:string(a.title,140),intro:string(a.intro,2500),facts:strings(a.facts,15,400),
       history:strings(a.history,20,2000),videoUrl:videoUrl(a.videoUrl),photo:photoUrl(a.photo),
@@ -123,6 +146,8 @@ export function validateCulture(value:unknown):CultureContent {
       clubsPhone:string(contact.clubsPhone,60),eventsPhone:string(contact.eventsPhone,60),
       email:string(contact.email,100),hours:string(contact.hours,120),website:httpsUrl(contact.website)},
     categories,leaders,collectives,
+    navigation:{title:string(n.title,150),intro:string(n.intro,1300),
+      notice:string(n.notice,900),floors},
   };
   if(Buffer.byteLength(JSON.stringify(data),'utf8')>MAX_BYTES)throw Error('Превышен размер каталога');
   return data;
@@ -131,6 +156,11 @@ export function validateCulture(value:unknown):CultureContent {
 // until an editor explicitly saves/publishes; all custom authored fields survive.
 export function enrichLegacySafety(content:CultureContent):CultureContent{
   const copy=structuredClone(content);
+  // Add new, reviewed materials without replacing text authored by employees.
+  const existingIds=new Set(copy.safety.sections.map(x=>x.id));
+  for(const section of starterContent.safety.sections){
+    if(!existingIds.has(section.id))copy.safety.sections.push(structuredClone(section));
+  }
   const old=copy.safety.sections;
   const legacy=old.some(s=>s.id==='objects'||s.id==='health');
   if(legacy){

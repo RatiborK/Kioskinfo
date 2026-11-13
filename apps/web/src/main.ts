@@ -10,6 +10,7 @@ import './kiosk-motion.css';
 import './cultural-content.css';
 import './culture-pages.css';
 import './kiosk-touch.css';
+import './stage056.css';
 
 const router = createRouter({
   history: createWebHistory(),

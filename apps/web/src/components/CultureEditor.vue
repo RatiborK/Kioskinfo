@@ -1,21 +1,40 @@
 <!-- apps/web/src/components/CultureEditor.vue — versioned staff editing of all visitor content. -->
 <script setup lang="ts">
 import {computed,onMounted,ref} from 'vue';
-import type {CultureContent,CultureCollective,CultureLeader,CultureState} from '../utils/culture-types.js';
+import NavigationPanel from './NavigationPanel.vue';
+import type {CultureContent,CultureCollective,CultureLeader,CultureState,FloorPoint} from '../utils/culture-types.js';
 type Role='admin'|'editor'|'viewer';
 const props=defineProps<{role:Role}>();
 const state=ref<CultureState|null>(null),draft=ref<CultureContent|null>(null);
-const selectedPanel=ref<'clubs'|'leaders'|'about'|'safety'|'tickets'|'contacts'>('clubs');
+const selectedPanel=ref<'clubs'|'leaders'|'about'|'safety'|'tickets'|'contacts'|'navigation'>('clubs');
 const groupId=ref(''),leaderId=ref('');
 const busy=ref(false),dirty=ref(false),message=ref('Загрузка материалов…'),error=ref('');
 const panels=[
   {id:'clubs',name:'Коллективы'},{id:'leaders',name:'Руководители'},
   {id:'about',name:'О ДК'},{id:'safety',name:'Безопасность'},
   {id:'tickets',name:'Билеты'},{id:'contacts',name:'Контакты'},
+  {id:'navigation',name:'Планы ДК'},
 ] as const;
 const canEdit=computed(()=>props.role==='admin'||props.role==='editor');
 const group=computed(()=>draft.value?.collectives.find(x=>x.id===groupId.value)??null);
 const leader=computed(()=>draft.value?.leaders.find(x=>x.id===leaderId.value)??null);
+const navSelection=ref<{floorId:string;id:string}|null>(null);
+const navPoint=computed<FloorPoint|null>(()=>{
+ if(!draft.value||!navSelection.value)return null;
+ return draft.value.navigation.floors.find(f=>f.id===navSelection.value!.floorId)?.points.find(p=>p.id===navSelection.value!.id)??null;
+});
+function addNavPoint(event:{floorId:string;x:number;y:number}){
+ if(!draft.value||!canEdit.value)return;
+ const floor=draft.value.navigation.floors.find(f=>f.id===event.floorId);if(!floor)return;
+ const point:FloorPoint={id:newId('point'),title:'Новый объект',kind:'other',x:event.x,y:event.y,description:''};
+ floor.points.push(point);navSelection.value={floorId:event.floorId,id:point.id};touch();
+}
+function chooseNavPoint(event:{floorId:string;id:string}){navSelection.value=event;}
+function removeNavPoint(){
+ if(!draft.value||!navSelection.value||!canEdit.value)return;
+ const floor=draft.value.navigation.floors.find(f=>f.id===navSelection.value?.floorId);
+ if(!floor)return;floor.points=floor.points.filter(p=>p.id!==navSelection.value?.id);navSelection.value=null;touch();
+}
 const selectedCategoryTitle=computed(()=>draft.value?.categories.find(c=>c.id===group.value?.category)?.title??'');
 const headers={'Content-Type':'application/json','X-Navikultura-Action':'1'};
 async function api<T>(url:string,init:RequestInit={}):Promise<T>{
@@ -223,6 +242,36 @@ onMounted(()=>{void load();});
             <textarea v-model="section.paragraphs[index]" rows="3" :disabled="!canEdit" @input="touch"/></label>
         </article>
         <label>Важное уведомление<textarea v-model="draft.safety.notice" rows="4" :disabled="!canEdit" @input="touch"/></label>
+      </section>
+
+      <section v-else-if="selectedPanel==='navigation'" class="culture-editor-fields culture-editor-prose">
+        <h3>Интерактивный план ДК</h3>
+        <p>Коснитесь точки на плане: здесь будет создан объект. Названия этажей и кабинетов уточните по оригинальному чертежу; не размещайте неподтверждённые маршруты эвакуации.</p>
+        <label>Заголовок<input v-model="draft.navigation.title" maxlength="150" :disabled="!canEdit" @input="touch"/></label>
+        <label>Вступление<textarea v-model="draft.navigation.intro" rows="3" maxlength="1300" :disabled="!canEdit" @input="touch"/></label>
+        <NavigationPanel :navigation="draft.navigation" :editable="canEdit"
+          @add-point="addNavPoint" @select-point="chooseNavPoint"/>
+        <h3>Названия уровней</h3>
+        <div v-for="floor in draft.navigation.floors" :key="floor.id" class="culture-safety-edit-card">
+          <label>Название схемы {{floor.id}}<input v-model="floor.title" maxlength="100" :disabled="!canEdit" @input="touch"/></label>
+          <label>Примечание<textarea v-model="floor.note" rows="2" maxlength="260" :disabled="!canEdit" @input="touch"/></label>
+        </div>
+        <div v-if="navPoint" class="culture-safety-edit-card">
+          <h3>Выбранный объект</h3>
+          <label>Название<input v-model="navPoint.title" maxlength="110" :disabled="!canEdit" @input="touch"/></label>
+          <label>Тип объекта<select v-model="navPoint.kind" :disabled="!canEdit" @change="touch">
+            <option value="hall">Зал</option><option value="studio">Кабинет</option>
+            <option value="service">Сервис</option><option value="stairs">Лестница</option>
+            <option value="exit">Выход</option><option value="other">Другое</option>
+          </select></label>
+          <label>Описание<textarea v-model="navPoint.description" rows="3" maxlength="1000" :disabled="!canEdit" @input="touch"/></label>
+          <div class="culture-navigation-positions">
+            <label>Горизонталь, %<input v-model.number="navPoint.x" type="number" min="0" max="100" step=".1" :disabled="!canEdit" @input="touch"/></label>
+            <label>Вертикаль, %<input v-model.number="navPoint.y" type="number" min="0" max="100" step=".1" :disabled="!canEdit" @input="touch"/></label>
+          </div>
+          <button v-if="canEdit" type="button" class="secondary-button" @click="removeNavPoint">Удалить точку</button>
+        </div>
+        <label>Примечание для посетителей<textarea v-model="draft.navigation.notice" rows="3" maxlength="900" :disabled="!canEdit" @input="touch"/></label>
       </section>
       <section v-else-if="selectedPanel==='tickets'" class="culture-editor-fields culture-editor-prose">
         <h3>Билеты</h3>

@@ -3,9 +3,9 @@
 import {computed,onMounted,onBeforeUnmount,ref} from 'vue';
 import KioskKeyboard from './KioskKeyboard.vue';
 import {searchKiosk,type KioskSearchResult, type SearchData} from '../utils/global-search.js';
-const props=defineProps<{data:SearchData}>();
+const props=withDefaults(defineProps<{data:SearchData;initialKeyboard?:boolean}>(),{initialKeyboard:false});
 const emit=defineEmits<{(e:'close'):void;(e:'open-result',result:KioskSearchResult):void}>();
-const query=ref(''),keyboard=ref(true),input=ref<HTMLInputElement|null>(null);
+const query=ref(''),keyboard=ref(props.initialKeyboard),input=ref<HTMLInputElement|null>(null);
 const results=computed(()=>searchKiosk(props.data,query.value));
 const suggestions=[
  {name:'Коллективы',query:'коллектив'}, {name:'Концерты',query:'концерт'},

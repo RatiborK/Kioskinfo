@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import {computed,ref} from 'vue';
 import type {CultureContent} from '../utils/culture-types.js';
+import SafetyMedia from './SafetyMedia.vue';
 const props=defineProps<{content:CultureContent;mode:'about'|'safety'|'tickets'|'contacts'}>();
 const emit=defineEmits<{(e:'open-video',url:string,title:string):void;(e:'buy-ticket',url:string):void}>();
 const openSection=ref<string|null>(null);
@@ -63,6 +64,7 @@ function safetyScroll(id:string){
           <ol>
             <li v-for="(paragraph,p) in section.paragraphs" :key="p"><span>{{String(p+1).padStart(2,'0')}}</span><p>{{paragraph}}</p></li>
           </ol>
+          <SafetyMedia :section-id="section.id"/>
         </div>
       </section>
     </div>
