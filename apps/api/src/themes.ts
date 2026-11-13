@@ -15,18 +15,24 @@ export const THEME_NAMES:Record<VisitorThemeId,string>={
 export function isThemeId(value:unknown):value is VisitorThemeId{
   return typeof value==='string' && (VISITOR_THEME_IDS as readonly string[]).includes(value);
 }
+export const DEFAULT_DK_BACKGROUND='#2c3e50';
+export const DEFAULT_DK_GLOW='#4ca1af';
+export const isHexColor=(value:unknown):value is string=>
+  typeof value==='string'&&/^#[0-9a-fA-F]{6}$/.test(value);
 export interface ThemeSettings{
   draft:VisitorThemeId;published:VisitorThemeId;revision:number;
-  published_revision:number;updatedAt:string;fullscreenEnabled:boolean;
+  published_revision:number;updatedAt:string;fullscreenEnabled:boolean;dkBackground:string;dkGlow:string;
 }
 export const defaultThemeSettings=():ThemeSettings=>({
   draft:'dk',published:'dk',revision:1,published_revision:1,updatedAt:new Date(0).toISOString(),fullscreenEnabled:false,
+  dkBackground:DEFAULT_DK_BACKGROUND,dkGlow:DEFAULT_DK_GLOW,
 });
 export interface ThemeRepository{
   get():Promise<ThemeSettings>;
   choose(id:VisitorThemeId,expectedRevision:number):Promise<ThemeSettings|null>;
   publish(expectedRevision:number):Promise<ThemeSettings|null>;
   setFullscreen(enabled:boolean,expectedRevision:number):Promise<ThemeSettings|null>;
+  setDkColors(background:string,glow:string,expectedRevision:number):Promise<ThemeSettings|null>;
 }
 function checked(input:unknown):ThemeSettings{
   if(!input||typeof input!=='object'||Array.isArray(input))throw Error('Повреждены настройки темы');
@@ -38,7 +44,11 @@ function checked(input:unknown):ThemeSettings{
        throw Error('Повреждены настройки темы');
   // Old installations can omit this optional persisted field.
   if(v.fullscreenEnabled!==undefined&&typeof v.fullscreenEnabled!=='boolean')throw Error('Повреждена настройка полного экрана');
-  return {...v,fullscreenEnabled:v.fullscreenEnabled??false} as ThemeSettings;
+  if(v.dkBackground!==undefined&&!isHexColor(v.dkBackground))throw Error('Недопустимый цвет фона ДК');
+  if(v.dkGlow!==undefined&&!isHexColor(v.dkGlow))throw Error('Недопустимый цвет светового пятна');
+  return {...v,fullscreenEnabled:v.fullscreenEnabled??false,
+    dkBackground:v.dkBackground??DEFAULT_DK_BACKGROUND,
+    dkGlow:v.dkGlow??DEFAULT_DK_GLOW} as ThemeSettings;
 }
 export const defaultThemeFile=()=>fileURLToPath(new URL('../../../content/settings/visitor-theme.json',import.meta.url));
 export class FileThemeRepository implements ThemeRepository{
@@ -95,6 +105,16 @@ export class FileThemeRepository implements ThemeRepository{
       await this.write(next);return next;
     });
   }
+  async setDkColors(background:string,glow:string,expectedRevision:number){
+    if(!isHexColor(background)||!isHexColor(glow))throw Error('Недопустимые цвета');
+    return this.locked(async()=>{
+      const old=await this.readStrict();
+      if(old.revision!==expectedRevision)return null;
+      const next={...old,dkBackground:background.toLowerCase(),dkGlow:glow.toLowerCase(),
+        revision:old.revision+1,updatedAt:new Date().toISOString()};
+      await this.write(next);return next;
+    });
+  }
 }
 // Production storage: one row, optimistic revision control, parameterised SQL.
 export class PgThemeRepository implements ThemeRepository{
@@ -102,27 +122,35 @@ export class PgThemeRepository implements ThemeRepository{
   private map(row:Record<string,unknown>):ThemeSettings{
     return checked({draft:row.draft,published:row.published,revision:Number(row.revision),
       published_revision:Number(row.published_revision),fullscreenEnabled:row.fullscreen_enabled,
+      dkBackground:row.dk_background,dkGlow:row.dk_glow,
       updatedAt:new Date(row.updated_at as string|Date).toISOString()});
   }
   async get(){
-    const r=await this.pool.query('SELECT draft,published,revision,published_revision,updated_at,fullscreen_enabled FROM visitor_theme_settings WHERE id=1');
+    const r=await this.pool.query('SELECT draft,published,revision,published_revision,updated_at,fullscreen_enabled,dk_background,dk_glow FROM visitor_theme_settings WHERE id=1');
     if(!r.rows[0])throw Error('Примените миграции базы данных для тем посетителя');
     return this.map(r.rows[0]);
   }
   async choose(id:VisitorThemeId,expectedRevision:number){
     if(!isThemeId(id))throw Error('Неизвестная тема');
-    const r=await this.pool.query(`UPDATE visitor_theme_settings SET draft=$1,revision=revision+1,updated_at=now() WHERE id=1 AND revision=$2 RETURNING draft,published,revision,published_revision,updated_at,fullscreen_enabled`,[id,expectedRevision]);
+    const r=await this.pool.query(`UPDATE visitor_theme_settings SET draft=$1,revision=revision+1,updated_at=now() WHERE id=1 AND revision=$2 RETURNING draft,published,revision,published_revision,updated_at,fullscreen_enabled,dk_background,dk_glow`,[id,expectedRevision]);
     return r.rows[0]?this.map(r.rows[0]):null;
   }
   async publish(expectedRevision:number){
-    const r=await this.pool.query(`UPDATE visitor_theme_settings SET published=draft,published_revision=revision,updated_at=now() WHERE id=1 AND revision=$1 RETURNING draft,published,revision,published_revision,updated_at,fullscreen_enabled`,[expectedRevision]);
+    const r=await this.pool.query(`UPDATE visitor_theme_settings SET published=draft,published_revision=revision,updated_at=now() WHERE id=1 AND revision=$1 RETURNING draft,published,revision,published_revision,updated_at,fullscreen_enabled,dk_background,dk_glow`,[expectedRevision]);
     return r.rows[0]?this.map(r.rows[0]):null;
   }
   async setFullscreen(enabled:boolean,expectedRevision:number){
     if(typeof enabled!=='boolean')throw Error('Неверное значение полного экрана');
     const r=await this.pool.query(
-      'UPDATE visitor_theme_settings SET fullscreen_enabled=$1,revision=revision+1,updated_at=now() WHERE id=1 AND revision=$2 RETURNING draft,published,revision,published_revision,updated_at,fullscreen_enabled',
+      'UPDATE visitor_theme_settings SET fullscreen_enabled=$1,revision=revision+1,updated_at=now() WHERE id=1 AND revision=$2 RETURNING draft,published,revision,published_revision,updated_at,fullscreen_enabled,dk_background,dk_glow',
       [enabled,expectedRevision]);
+    return r.rows[0]?this.map(r.rows[0]):null;
+  }
+  async setDkColors(background:string,glow:string,expectedRevision:number){
+    if(!isHexColor(background)||!isHexColor(glow))throw Error('Недопустимые цвета');
+    const r=await this.pool.query(
+      'UPDATE visitor_theme_settings SET dk_background=$1,dk_glow=$2,revision=revision+1,updated_at=now() WHERE id=1 AND revision=$3 RETURNING draft,published,revision,published_revision,updated_at,fullscreen_enabled,dk_background,dk_glow',
+      [background.toLowerCase(),glow.toLowerCase(),expectedRevision]);
     return r.rows[0]?this.map(r.rows[0]):null;
   }
 }
