@@ -332,3 +332,50 @@ test('viewer cannot edit or publish cultural content',async()=>{
       payload:{expectedRevision:1}})).statusCode,403);
   }finally{await app.close();await rm(dir,{recursive:true,force:true});}
 });
+
+test('public culture still loads if the legacy schedule repository throws',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-broken-schedule-'));
+  const app=createApp({store:new MemoryStore(),
+    culture:new FileCultureRepository(join(dir,'catalog.json')),
+    schedule:{list:async()=>{throw Error('retired schedule corrupted');}} as unknown as ScheduleRepository});
+  try{
+    const r=await app.inject({method:'GET',url:'/api/public/culture'});
+    assert.equal(r.statusCode,200);
+    assert.ok(r.json().content.collectives.length>=35);
+    assert.ok(r.json().content.leaders.length>=28);
+    assert.ok(r.json().content.safety.sections.length>=17);
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
+});
+test('admin can restore only missing base collectives, without publishing or granting editor rights',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'navikultura-api-recover-'));
+  const repo=new FileCultureRepository(join(dir,'catalog.json'));
+  const before=await repo.get();
+  const draft=structuredClone(before.draft);
+  draft.collectives.shift();
+  draft.collectives[0].history='Сохранённый авторский текст';
+  const changed=await repo.update(draft,1);
+  assert.equal(changed?.revision,2);
+  const store=new MemoryStore();
+  store.accounts=[{id:'culture-admin',username:'cultureadmin',display_name:'Редактор',
+    role:'admin',password_hash:await hashPassword('some-strong-password-123'),enabled:true}];
+  const app=createApp({store,culture:repo,allowedOrigin:'http://127.0.0.1:5173'});
+  try{
+    assert.equal((await app.inject({method:'POST',url:'/api/editor/culture/restore-starter',
+      headers,payload:{expectedRevision:2}})).statusCode,401);
+    const login=await app.inject(loginBody('cultureadmin','some-strong-password-123'));
+    const cookie=String(login.headers['set-cookie']).split(';')[0];
+    const restored=await app.inject({method:'POST',url:'/api/editor/culture/restore-starter',
+      headers:{...headers,cookie},payload:{expectedRevision:2}});
+    assert.equal(restored.statusCode,200);
+    assert.equal(restored.json().added.collectives,1);
+    assert.equal((await repo.get()).draft.collectives.length,before.draft.collectives.length);
+    assert.equal((await repo.get()).draft.collectives.find(x=>x.id===draft.collectives[0].id)?.history,
+      'Сохранённый авторский текст');
+    assert.equal((await repo.get()).publishedRevision,1);
+    assert.ok(store.events.includes('culture.restore-starter'));
+    const again=await app.inject({method:'POST',url:'/api/editor/culture/restore-starter',
+      headers:{...headers,cookie},payload:{expectedRevision:3}});
+    assert.equal(again.statusCode,200);
+    assert.equal(again.json().added.collectives,0);
+  }finally{await app.close();await rm(dir,{recursive:true,force:true});}
+});
