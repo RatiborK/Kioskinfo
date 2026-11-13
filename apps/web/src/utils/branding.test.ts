@@ -22,7 +22,8 @@ test('all eight visitor sections use the single dual-color SVG component',async(
 });
 
 test('visitor themes each supply distinct primary and secondary icon colors',async()=>{
-  const css=await read('../visitor-themes.css');
+  // Windows Git checkouts use CRLF; CSS validation must be platform-independent.
+  const css=(await read('../visitor-themes.css')).replace(/\r\n/g,'\n');
   for(const theme of themes){
     const selector=`:is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="${theme}"]{\n  --nav-icon-primary:`;
     const start=css.indexOf(selector);
@@ -37,15 +38,21 @@ test('visitor themes each supply distinct primary and secondary icon colors',asy
   }
 });
 
-test('DK logo appears in both visitor and staff header with no data dependency',async()=>{
-  const svg=await read('../components/DkLogo.vue');
+test('approved SVG mark is the single source for visitor, editor and browser branding',async()=>{
+  const component=await read('../components/DkLogo.vue');
+  const source=await read('../../public/brand/dk-kirovsky-symbol.svg');
   const screen=await read('../views/ScreenView.vue');
   const editor=await read('../views/EditorView.vue');
-  assert.match(svg,/КИРОВСКИЙ/);
-  assert.match(svg,/ДВОРЕЦ КУЛЬТУРЫ/);
-  assert.match(svg,/viewBox="0 0 424 96"/);
+  const index=await read('../../index.html');
+  assert.match(component,/КИРОВСКИЙ/);
+  assert.match(component,/ДВОРЕЦ КУЛЬТУРЫ/);
+  assert.match(component,/src="\/brand\/dk-kirovsky-symbol\.svg"/);
+  assert.equal((source.match(/<polygon /g)??[]).length,5);
+  assert.match(source,/viewBox="128 90 990 1100"/);
+  for(const color of ['#080808','#FF7900','#0874FF'])assert.ok(source.includes(color));
   assert.match(screen,/<DkLogo class="kiosk-dk-logo"\s*\/>/);
   assert.match(editor,/<DkLogo class="editor-brand-logo"\s*\/>/);
+  assert.match(index,/href="\/brand\/dk-kirovsky-symbol\.svg"/);
   assert.doesNotMatch(screen,/class="brand-glyph"/);
 });
 
