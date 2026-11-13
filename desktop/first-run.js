@@ -20,7 +20,9 @@ form.addEventListener('submit', async event => {
     const response = await window.navikulturaDesktop.setupAdmin(password);
     if (!response?.ok) throw Error(response?.message || 'Ошибка настройки');
     form.reset();
-    button.textContent = 'Открывается экран посетителя…';
+    button.textContent = response.alreadyInitialized
+      ? 'Учётная запись уже сохранена. Открывается экран…'
+      : 'Администратор создан. Открывается экран…';
   } catch (err) {
     error.textContent = err.message || 'Не удалось сохранить пароль';
     button.disabled = false;

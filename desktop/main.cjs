@@ -8,14 +8,17 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { spawn } = require('node:child_process');
 const { DesktopStore } = require('./lib/store.cjs');
+const { trustedFrame: validateIpcFrame } = require('./lib/trust.cjs');
 
-const smoke = process.argv.includes('--smoke-test');
+const onboardingSmoke = process.argv.includes('--smoke-onboarding');
+const smoke = process.argv.includes('--smoke-test') || onboardingSmoke;
 let window = null;
 let server = null;
 let origin = '';
 let store = null;
 let hashPassword = null;
 let dataDir = '';
+let initializingAdmin = false;
 
 app.setName('НавиКультура');
 if (!app.requestSingleInstanceLock()) app.quit();
@@ -81,11 +84,21 @@ async function startServer(dir) {
   }
 }
 function trustedFrame(event, setup = false) {
-  if (!window || event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame)
-    return false;
-  const url = event.senderFrame.url;
-  const setupUrl = pathToFileURL(path.join(__dirname, 'first-run.html')).href;
-  return setup ? url === setupUrl : url.startsWith(origin + '/');
+  return validateIpcFrame(event, window, {
+    setupPath: path.join(__dirname, 'first-run.html'),
+    origin,
+    setup,
+  });
+}
+function enterVisitorScreen() {
+  // Return the IPC success response before navigating away from its renderer.
+  setTimeout(() => {
+    if (!window || window.isDestroyed()) return;
+    void window.loadURL(origin + '/screen').catch(error => {
+      dialog.showErrorBox('НавиКультура: переход к экрану',
+        error instanceof Error ? error.message : String(error));
+    });
+  }, 250);
 }
 function launchKeyboard() {
   return new Promise(resolve => {
@@ -104,18 +117,31 @@ function installIpc() {
     return launchKeyboard();
   });
   ipcMain.handle('navikultura:setup', async (event, password) => {
-    if (!trustedFrame(event, true) || store.initialized)
-      return { ok: false, message: 'Настройка недоступна' };
+    if (!trustedFrame(event, true)) {
+      return { ok: false, code: 'UNTRUSTED_FRAME',
+        message: 'Не удалось подтвердить окно первого запуска. Обновите EXE до версии 0.4.1.' };
+    }
+    // The prior build could have saved the account but failed to navigate.
+    // Never overwrite or reset that account: resume the visitor screen.
+    if (store.initialized) {
+      enterVisitorScreen();
+      return { ok: true, alreadyInitialized: true };
+    }
+    if (initializingAdmin) {
+      return { ok: false, code: 'SETUP_BUSY', message: 'Создание администратора уже выполняется' };
+    }
+    initializingAdmin = true;
     try {
       await store.initializeAdmin(password, hashPassword);
-      setImmediate(() => { if (window && !window.isDestroyed()) void window.loadURL(origin + '/screen'); });
-      return { ok: true };
+      enterVisitorScreen();
+      return { ok: true, alreadyInitialized: false };
     } catch (error) {
-      return { ok: false, message: error instanceof Error ? error.message : 'Ошибка сохранения' };
-    }
+      return { ok: false, code: 'SETUP_FAILED',
+        message: error instanceof Error ? error.message : 'Ошибка сохранения' };
+    } finally { initializingAdmin = false; }
   });
 }
-function openWindow() {
+function openWindow({hidden = false} = {}) {
   window = new BrowserWindow({
     title: 'НавиКультура — ДК «Кировский»', show: false, backgroundColor: '#2c3e50',
     fullscreen: true, kiosk: true, frame: false, autoHideMenuBar: true,
@@ -145,7 +171,7 @@ function openWindow() {
       if (answer === 1) app.quit();
     }
   });
-  window.once('ready-to-show', () => window?.show());
+  window.once('ready-to-show', () => { if (!hidden) window?.show(); });
   window.on('closed', () => { window = null; });
   if (store.initialized) void window.loadURL(origin + '/screen');
   else void window.loadFile(path.join(__dirname, 'first-run.html'));
@@ -158,7 +184,7 @@ async function run() {
     const result = await startServer(dataDir);
     server = result.fastify; origin = result.url;
     store = result.state; hashPassword = result.hash;
-    if (smoke) {
+    if (smoke && !onboardingSmoke) {
       const [health, page, asset] = await Promise.all([
         fetch(origin + '/api/health'), fetch(origin + '/screen'),
         fetch(origin + '/brand/dk-kirovsky-symbol.svg'),
@@ -173,6 +199,43 @@ async function run() {
       return;
     }
     installIpc();
+    if (onboardingSmoke) {
+      // Execute the real file:// preload, real IPC handler, and on-disk setup.
+      // This catches permission/frame validation failures missing from the API smoke.
+      const firstLoad = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(Error('First-run screen timed out')), 15000);
+        app.once('browser-window-created', (_event, created) => {
+          created.webContents.once('did-finish-load', () => { clearTimeout(timer); resolve(); });
+          created.webContents.once('did-fail-load', (_event, code, description) => {
+            clearTimeout(timer); reject(Error('First-run load failed: ' + code + ' ' + description));
+          });
+        });
+      });
+      openWindow({hidden: true});
+      await firstLoad;
+      const screenLoaded = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(Error('Setup IPC did not navigate to /screen')), 15000);
+        window.webContents.on('did-finish-load', () => {
+          if (window.webContents.getURL() === origin + '/screen') {
+            clearTimeout(timer); resolve();
+          }
+        });
+      });
+      const result = await window.webContents.executeJavaScript(
+        'window.navikulturaDesktop.setupAdmin("Smoke-Only-Password-2026!")');
+      if (!result?.ok) throw Error('First-run IPC rejected setup: ' + JSON.stringify(result));
+      await screenLoaded;
+      const persisted = await DesktopStore.open(path.join(dataDir, 'state'));
+      const raw = await fs.readFile(path.join(dataDir, 'state', 'admin.json'), 'utf8');
+      if (!persisted.initialized || raw.includes('Smoke-Only-Password-2026!'))
+        throw Error('First-run credentials were not safely persisted');
+      process.stdout.write('NAVIKULTURA_FIRST_RUN_IPC_PASS\n');
+      window.destroy(); window = null;
+      await server.close(); server = null;
+      await fs.rm(dataDir, { recursive: true, force: true });
+      app.exit(0);
+      return;
+    }
     openWindow();
   } catch (error) {
     const message = error instanceof Error ? error.stack || error.message : String(error);
