@@ -9,7 +9,7 @@
     "dev:api": "npm run dev -w @navikultura/api",
     "dev:web": "npm run dev -w @navikultura/web",
     "build": "npm run build --workspaces --if-present",
-    "check": "npm run typecheck --workspaces --if-present && npm run test --workspaces --if-present && npm run build --workspaces --if-present",
+    "check": "node --test tools/kiosk-windows-keyboard.test.cjs && npm run typecheck --workspaces --if-present && npm run test --workspaces --if-present && npm run build --workspaces --if-present",
     "dev:preview": "npm run dev:preview -w @navikultura/api"
   },
   "engines": {
