@@ -66,6 +66,7 @@ const user = ref<Account|null>(null);
 const username = ref(''); const password = ref('');
 const loginKeyboard=ref(false),loginKeyboardTarget=ref<'username'|'password'>('username');
 const isFullscreen=ref(false),fullscreenError=ref('');
+const nativeFullscreenShell=Boolean((window as Window & {navikulturaDesktop?:unknown}).navikulturaDesktop);
 function editCredential(value:string){
   if(loginKeyboardTarget.value==='username')username.value=value;
   else password.value=value;
@@ -229,7 +230,7 @@ onBeforeUnmount(()=>{
           <h1>Кабинет сотрудника<span class="dot">.</span></h1></div>
       </div>
       <div class="editor-header-actions">
-        <button type="button" class="editor-link editor-fullscreen-button" @click="toggleBrowserFullscreen">
+        <button type="button" v-if="!nativeFullscreenShell" class="editor-link editor-fullscreen-button" @click="toggleBrowserFullscreen">
           {{isFullscreen?'Свернуть экран':'Полный экран'}}
         </button>
         <router-link class="editor-link" to="/screen">Экран посетителя →</router-link>

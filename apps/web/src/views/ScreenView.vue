@@ -16,7 +16,7 @@ import {DK_BACKGROUND,DK_GLOW,dkThemeVars,normalizeHex} from '../utils/dk-colors
 import type {KioskSearchResult} from '../utils/global-search.ts';
 import type {CultureContent} from '../utils/culture-types.js';
 import type {PublicEvent,PublicDocument} from '../utils/content-types.js';
-import {visiblePosterWindow,shouldReturnHome,posterSwipe} from '../utils/kiosk-behavior.js';
+import {visiblePosterWindow,shouldReturnHome,posterSwipe,sectionSwipe} from '../utils/kiosk-behavior.js';
 
 const MUZA_ORGANIZATION='https://muzaticket.ru/iframe/organizations/organization-mau-gdk-kirovskii-448753';
 const items=[
@@ -52,12 +52,13 @@ const selectedFloorId=ref('floor-1'),selectedMapPoint=ref('');
 type VisitorTheme='dk'|'holiday'|'modern'|'aurora'|'poster'|'gallery'|'neon'|'kids';
 const visitorTheme=ref<VisitorTheme>('dk'),knownThemes=new Set(['dk','holiday','modern','aurora','poster','gallery','neon','kids']);
 const fullscreenEnabled=ref(false),fullscreenActive=ref(false);
+const nativeFullscreenShell=Boolean((window as Window & {navikulturaDesktop?:unknown}).navikulturaDesktop);
 const dkBackground=ref(DK_BACKGROUND),dkGlow=ref(DK_GLOW);
 const dkStyle=computed(()=>visitorTheme.value==='dk'?dkThemeVars(dkBackground.value,dkGlow.value):undefined);
 let fullscreenGestureFailed=false;
 function syncFullscreen(){fullscreenActive.value=!!document.fullscreenElement;}
 function fullscreenOnGesture(){
-  if(!fullscreenEnabled.value||document.fullscreenElement||fullscreenGestureFailed)return;
+  if(nativeFullscreenShell||!fullscreenEnabled.value||document.fullscreenElement||fullscreenGestureFailed)return;
   void document.documentElement.requestFullscreen().catch(()=>{fullscreenGestureFailed=true;});
 }
 async function fullscreenFromButton(){
@@ -70,6 +71,25 @@ let inactivityTimer:ReturnType<typeof setInterval>|undefined;
 let lastActivity=Date.now(),lastManualPoster=0;
 const IDLE_MS=180000;
 let touchStart:{x:number;y:number;id:number}|null=null;
+let sectionTouchStart:{x:number;y:number;id:number}|null=null;
+const touchNoSectionSelector='button,a,input,textarea,select,label,iframe,video,audio,[contenteditable],.kiosk-home-stage,.floor-navigation-map,.floor-navigation-map-container,.document-pdf-frame,.kiosk-global-search,.kiosk-ticket-modal,.kiosk-video-panel,.culture-directory-search,.floor-navigation-map-viewport';
+function sectionTouchDown(event:PointerEvent){
+  if(event.pointerType!=='touch'&&event.pointerType!=='pen')return;
+  if(current.value==='posters'||globalSearchOpen.value||ticketOpen.value||activeVideo.value||
+    (event.target as HTMLElement).closest(touchNoSectionSelector))return;
+  sectionTouchStart={x:event.clientX,y:event.clientY,id:event.pointerId};activity();
+}
+function sectionTouchUp(event:PointerEvent){
+  const start=sectionTouchStart;sectionTouchStart=null;
+  if(!start||start.id!==event.pointerId||current.value==='posters'||globalSearchOpen.value||ticketOpen.value||activeVideo.value)return;
+  if((event.target as HTMLElement).closest(touchNoSectionSelector))return;
+  const direction=sectionSwipe(event.clientX-start.x,event.clientY-start.y);
+  if(!direction)return;
+  const at=items.findIndex(item=>item.id===current.value);
+  const next=items[at+direction];
+  if(next)go(next.id);
+}
+function sectionTouchCancel(){sectionTouchStart=null;}
 function activity(){lastActivity=Date.now();}
 function go(section:Section){
   activity();globalSearchOpen.value=false;
@@ -189,7 +209,7 @@ async function reloadTheme(){
     fullscreenEnabled.value=data.fullscreenEnabled===true;
     // Managed Edge can allow an automatic Fullscreen API request for this origin.
     // Ordinary browsers will reject it; the explicit button/first user gesture remains.
-    if(fullscreenEnabled.value&&!previouslyEnabled&&!document.fullscreenElement)
+    if(!nativeFullscreenShell&&fullscreenEnabled.value&&!previouslyEnabled&&!document.fullscreenElement)
       void document.documentElement.requestFullscreen().catch(()=>{});
   }catch{/* Keep last known color theme. */}
 }
@@ -226,10 +246,11 @@ onBeforeUnmount(()=>{
 <template>
   <main class="shell screen-shell" :class="{'kiosk-home':current==='posters'}" :data-visitor-theme="visitorTheme" :style="dkStyle">
     <Transition name="kiosk-page" mode="out-in" @after-enter="onEnter">
-      <div :key="current" ref="scrollRegion" class="screen-content" :class="{'screen-poster-page':current==='posters'}">
+      <div :key="current" ref="scrollRegion" class="screen-content" :class="{'screen-poster-page':current==='posters'}"
+        @pointerdown="sectionTouchDown" @pointerup="sectionTouchUp" @pointercancel="sectionTouchCancel">
         <header class="brand-row">
           <DkLogo class="kiosk-dk-logo"/>
-          <button v-if="fullscreenEnabled&&!fullscreenActive" type="button"
+          <button v-if="fullscreenEnabled&&!fullscreenActive&&!nativeFullscreenShell" type="button"
             class="kiosk-fullscreen-trigger" @click="fullscreenFromButton"
             aria-label="Открыть экран посетителя на весь экран">На весь экран</button>
           <button type="button" class="kiosk-search-trigger" aria-label="Поиск по всей НавиКультуре"

@@ -1,0 +1,36 @@
+/* desktop/first-run.css — first-run setup is fullscreen and accessible offline. */
+:root{color-scheme:dark;font-family:Segoe UI,Arial,sans-serif;background:#253a4a;color:#f8fafc}
+*{box-sizing:border-box}
+body{margin:0;min-height:100dvh;background:
+  radial-gradient(ellipse 60% 65% at 20% -15%,#4ca1af55,transparent),
+  repeating-linear-gradient(90deg,transparent 0 100px,#a5d6e912 100px 101px),#253a4a}
+.layout{min-height:100dvh;display:grid;place-items:center;padding:24px}
+.setup{max-width:620px;width:100%;padding:clamp(24px,4vw,56px);border:1px solid #7d91a360;border-radius:18px;background:#1c3041ed;box-shadow:0 30px 90px #0006}
+.label{font-size:12px;letter-spacing:.19em;font-weight:800;color:#a7cadc}
+h1{font-size:clamp(38px,6vw,65px);line-height:1.1;margin:18px 0}
+h1 span{color:#ff6a00}
+p{font-size:16px;line-height:1.6;color:#d5e0e7}
+form{display:flex;flex-direction:column;gap:15px;margin-top:30px}
+label{display:flex;flex-direction:column;gap:7px;font-size:15px;font-weight:700}
+label small{font-size:12px;font-weight:400;color:#c7d5de}
+input{font:inherit;font-size:17px;padding:13px 16px;min-height:50px;border:1px solid #7892a2;border-radius:9px;background:#152532;color:#fff}
+input:focus{outline:3px solid #4ca1af}
+button{font:inherit;font-weight:800;font-size:16px;border:none;border-radius:9px;background:#ff6a00;color:#101820;min-height:54px;padding:12px;cursor:pointer}
+button:disabled{opacity:.55;cursor:wait}
+.error{min-height:1.3em;color:#ffb5a4;margin:0}
+.notice{margin:22px 0 0;font-size:13px;color:#aac0ce}
+
+/* A self-contained first-run password keyboard; usable with finger alone. */
+.setup{max-width:min(780px,95vw)}
+.touch-keyboard{padding:12px;border:1px solid #536a7a;border-radius:11px;background:#142736}
+.touch-keyboard-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between;margin-bottom:10px}
+.touch-keyboard button{color:#eaf3fa;background:#2b4558;border:1px solid #7991a2;font-size:15px;min-width:40px;min-height:46px;padding:8px;border-radius:7px;touch-action:manipulation}
+.touch-keyboard button:active,.touch-keyboard button:focus-visible{background:#ff6a00;color:#142736}
+.touch-keyboard-rows{display:flex;flex-direction:column;gap:6px}
+.touch-keyboard-row{display:flex;justify-content:center;gap:4px;flex-wrap:nowrap}
+.touch-keyboard-row button{flex:1 1 0;min-width:0;padding:8px 0;font-size:clamp(13px,1.5vw,19px)}
+.touch-keyboard-actions{display:grid;grid-template-columns:2fr 1fr 1.5fr;gap:5px;margin-top:10px}
+.touch-keyboard-actions button{width:100%;min-width:0}
+html,body{overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+input,button{touch-action:manipulation}
+@media(max-width:620px){.layout{padding:8px}.setup{padding:18px}.touch-keyboard-row{gap:2px}.touch-keyboard-row button{min-height:40px;padding:5px 0}}

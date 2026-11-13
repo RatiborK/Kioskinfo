@@ -1,0 +1,56 @@
+# .github/workflows/portable-windows.yml — reproducible Windows runner build for a single portable EXE.
+name: Windows Portable EXE
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "apps/api/src/app.ts"
+      - "apps/web/src/views/**"
+      - "apps/web/src/components/TicketWidget.vue"
+      - ".github/workflows/portable-windows.yml"
+permissions:
+  contents: read
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+      - name: Install app and validate source
+        run: |
+          npm install --no-audit --no-fund
+          npm run check
+      - name: Install portable desktop dependencies
+        run: npm install --prefix desktop --no-audit --no-fund
+      - name: Stage built frontend and API into desktop package
+        run: npm run stage --prefix desktop
+      - name: Validate first-run desktop storage
+        run: npm run test --prefix desktop
+      - name: Build one portable Windows x64 EXE
+        run: npm run package:win --prefix desktop
+      - name: Smoke-test unpacked desktop application
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Get-ChildItem 'desktop/dist/win-unpacked' -Filter '*.exe' -File | Where-Object { $_.Name -notmatch 'crashpad|elevate' } | Select-Object -First 1
+          if (-not $exe) { throw 'Windows unpacked EXE missing' }
+          $p = Start-Process -FilePath $exe.FullName -ArgumentList '--smoke-test' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Desktop smoke failed with code $($p.ExitCode)" }
+          $portable = @(Get-ChildItem 'desktop/dist' -Filter 'Navikultura-*-Windows-x64.exe' -File)
+          if ($portable.Count -ne 1) { throw "Expected one portable EXE, got $($portable.Count)" }
+          $hash = Get-FileHash $portable[0].FullName -Algorithm SHA256
+          Write-Output "EXE: $($portable[0].Name) SIZE: $($portable[0].Length) SHA256: $($hash.Hash)"
+      - name: Upload portable Windows EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Navikultura-Windows-portable-exe
+          path: desktop/dist/Navikultura-*-Windows-x64.exe
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0

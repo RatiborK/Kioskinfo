@@ -28,6 +28,22 @@ async function showWindowsKeyboard() {
   keyboardStarting.value = true;
   keyboardHelp.value = false;
   keyboardMessage.value = '';
+  // The packaged Electron app owns the Windows session. Invoke OSK directly
+  // through a narrow, main-frame-only IPC bridge; no localhost helper needed.
+  const desktop = (window as Window & {
+    navikulturaDesktop?: {showKeyboard:()=>Promise<{ok:boolean;message?:string}>}
+  }).navikulturaDesktop;
+  if (desktop?.showKeyboard) {
+    try {
+      const result=await desktop.showKeyboard();
+      if(!result.ok)throw Error(result.message||'Windows не запустила экранную клавиатуру');
+      keyboardMessage.value='Системная клавиатура вызвана. Коснитесь поля в билетной форме.';
+    } catch(error) {
+      keyboardMessage.value=error instanceof Error?error.message:'Не удалось запустить клавиатуру Windows';
+      keyboardHelp.value=true;
+    } finally { keyboardStarting.value=false; }
+    return;
+  }
   const controller = new AbortController();
   keyboardAbort = controller;
   const timeout = window.setTimeout(() => controller.abort(), 3500);
@@ -99,7 +115,7 @@ onBeforeUnmount(() => {
         <p v-if="busy" class="kiosk-ticket-wait" role="status">Загружается билетная система…</p>
         <div v-if="keyboardHelp" class="kiosk-ticket-keyboard-help" role="alert">
           <strong>{{ keyboardMessage }}</strong>
-          <p>Нажмите на поле ввода Muzaticket: при включённом автоматическом показе Windows откроет сенсорную клавиатуру. Для работы этой кнопки мост должен быть запущен в интерактивной Windows-сессии терминала. Убедитесь, что адрес открытого сайта разрешён в настройке NAVIKULTURA_KIOSK_ORIGIN; если Edge запросит «Доступ к локальной сети», разрешите его только для доверенного сайта. Браузер сам по себе не запускает приложения Windows.</p>
+          <p>Нажмите на поле ввода Muzaticket: при включённом автоматическом показе Windows откроет сенсорную клавиатуру. В браузере необходим локальный мост клавиатуры. В переносимом EXE она запускается напрямую, без внешних программ. Убедитесь, что адрес открытого сайта разрешён в настройке NAVIKULTURA_KIOSK_ORIGIN; если Edge запросит «Доступ к локальной сети», разрешите его только для доверенного сайта. Браузер сам по себе не запускает приложения Windows.</p>
           <button type="button" @click="keyboardHelp=false">Закрыть</button>
         </div>
         <p v-else-if="keyboardMessage" class="kiosk-ticket-keyboard-result" role="status">{{ keyboardMessage }}</p>
