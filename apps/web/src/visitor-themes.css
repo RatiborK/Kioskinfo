@@ -226,3 +226,39 @@
   .screen-shell .poster-thumbnail{flex-basis:80px;width:80px;height:76px}
 }
 @media(prefers-reduced-motion:reduce){.screen-shell .kiosk-search-row button,.screen-shell .poster-thumbnail{transition:none}}
+
+/* Theme editor now previews the real DK brand lockup and both menu icon inks. */
+.visitor-theme-preview .theme-mini-dk-logo{
+  display:block;width:clamp(100px,11vw,156px);height:auto;max-height:40px;
+  padding:3px 4px;border:0;border-radius:4px;background:#fff;
+  box-sizing:border-box;
+}
+.visitor-theme-preview .theme-mini-icons{
+  align-items:stretch;flex-wrap:wrap;gap:8px;
+}
+.visitor-theme-preview .theme-mini-icons span{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  border-color:var(--v-line);
+}
+.visitor-theme-preview .theme-mini-icons .kiosk-menu-svg{
+  width:24px;height:24px;flex:0 0 24px;
+}
+.visitor-theme-preview .theme-mini-icons .menu-icon-primary{
+  stroke:var(--nav-icon-primary);
+}
+.visitor-theme-preview .theme-mini-icons .menu-icon-secondary{
+  stroke:var(--nav-icon-secondary);
+}
+.visitor-theme-preview .theme-mini-icons .menu-icon-secondary-solid{
+  stroke:var(--nav-icon-secondary);fill:var(--nav-icon-secondary);
+}
+.visitor-theme-large .theme-mini-dk-logo{
+  width:clamp(170px,22vw,280px);max-height:63px;
+}
+.visitor-theme-large .theme-mini-icons .kiosk-menu-svg{
+  width:31px;height:31px;flex-basis:31px;
+}
+@media(max-width:600px){
+  .visitor-theme-preview .theme-mini-dk-logo{width:clamp(106px,27vw,150px)}
+  .visitor-theme-large .theme-mini-dk-logo{width:210px}
+}
