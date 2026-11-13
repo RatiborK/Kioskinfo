@@ -2,10 +2,10 @@
    The administrator keeps a consistent neutral interface. Only the visitor screen
    and non-interactive theme previews use these palettes. No user-supplied CSS. */
 :is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="dk"]{
-  --v-bg:#090a10;--v-nav:#151620;--v-card:#191c28;--v-text:#f6f4ef;
-  --v-muted:#bec0ca;--v-accent:#ff914d;--v-on-accent:#17110d;
-  --v-alt:#8cb4ff;--v-line:#4a4d60;--v-radius:4px;--v-display:900;
-  --v-backdrop:radial-gradient(ellipse at 80% 14%,#25213b88,transparent 52%);
+  --v-bg:#f8fafc;--v-nav:#ffffff;--v-card:#ffffff;--v-text:#131c27;
+  --v-muted:#566578;--v-accent:#ff6a00;--v-on-accent:#131820;
+  --v-alt:#065cbd;--v-line:#d8e1eb;--v-radius:12px;--v-display:900;
+  --v-backdrop:radial-gradient(ellipse at 95% 0%,#dbebfc9a,transparent 57%);
 }
 :is(.screen-shell,.visitor-theme-preview)[data-visitor-theme="holiday"]{
   --v-bg:#200b16;--v-nav:#321329;--v-card:#3f1d2c;--v-text:#fff8e9;
