@@ -65,6 +65,7 @@ async function removePoster(item:Poster){
 const user = ref<Account|null>(null);
 const username = ref(''); const password = ref('');
 const loginKeyboard=ref(false),loginKeyboardTarget=ref<'username'|'password'>('username');
+const isFullscreen=ref(false),fullscreenError=ref('');
 function editCredential(value:string){
   if(loginKeyboardTarget.value==='username')username.value=value;
   else password.value=value;
@@ -193,9 +194,19 @@ let loginLastActivity=Date.now();
 let loginIdleTimer:ReturnType<typeof setInterval>|undefined;
 function loginActivity(){if(!user.value)loginLastActivity=Date.now();}
 function loginIdleCheck(){if(!user.value && Date.now()-loginLastActivity>=180000)void router.replace('/screen');}
+async function toggleBrowserFullscreen(){
+  fullscreenError.value='';
+  try{
+    if(document.fullscreenElement)await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+  }catch{fullscreenError.value='Браузер запретил полный экран. Используйте F11 или Edge kiosk.';}
+}
+function syncFullscreen(){isFullscreen.value=!!document.fullscreenElement;}
 function warnOnLeave(event:BeforeUnloadEvent){if(changed||busy.value){event.preventDefault();event.returnValue='';}}
 onMounted(()=>{
   window.addEventListener('beforeunload',warnOnLeave);
+  document.addEventListener('fullscreenchange',syncFullscreen);
+  syncFullscreen();
   window.addEventListener('pointerdown',loginActivity,{passive:true});
   window.addEventListener('keydown',loginActivity);
   loginIdleTimer=setInterval(loginIdleCheck,10000);
@@ -203,6 +214,7 @@ onMounted(()=>{
 });
 onBeforeUnmount(()=>{
   window.removeEventListener('beforeunload',warnOnLeave);
+  document.removeEventListener('fullscreenchange',syncFullscreen);
   window.removeEventListener('pointerdown',loginActivity);
   window.removeEventListener('keydown',loginActivity);
   if(loginIdleTimer)clearInterval(loginIdleTimer);
@@ -216,13 +228,19 @@ onBeforeUnmount(()=>{
         <div><span class="eyebrow">НАВИКУЛЬТУРА / УПРАВЛЕНИЕ</span>
           <h1>Кабинет сотрудника<span class="dot">.</span></h1></div>
       </div>
-      <a class="editor-link" href="/screen">Экран посетителя →</a>
+      <div class="editor-header-actions">
+        <button type="button" class="editor-link editor-fullscreen-button" @click="toggleBrowserFullscreen">
+          {{isFullscreen?'Свернуть экран':'Полный экран'}}
+        </button>
+        <router-link class="editor-link" to="/screen">Экран посетителя →</router-link>
+      </div>
     </header>
+    <p v-if="fullscreenError" class="editor-error" role="alert">{{fullscreenError}}</p>
     <section v-if="!user" class="editor-panel login-panel">
       <h2>Вход в систему</h2><p class="editor-hint">Редактирование доступно только сотрудникам с учётной записью.</p>
-      <form @submit.prevent="login"><label>Логин<input v-model="username" autocomplete="username" required maxlength="80"
+      <form autocomplete="off" @submit.prevent="login"><label>Логин<input v-model="username" name="navikultura-login" autocomplete="off" autocapitalize="none" spellcheck="false" required maxlength="80"
           @focus="loginKeyboardTarget='username'"/></label>
-        <label>Пароль<input v-model="password" type="password" autocomplete="current-password" required
+        <label>Пароль<input v-model="password" type="password" name="navikultura-secret" autocomplete="off" autocapitalize="none" spellcheck="false" required
           @focus="loginKeyboardTarget='password'"/></label>
         <div class="login-keyboard-bar">
           <button type="button" class="secondary-button" :aria-expanded="loginKeyboard"
