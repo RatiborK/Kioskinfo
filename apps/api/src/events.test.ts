@@ -10,7 +10,7 @@ const concert:EventFields={title:'Осенний концерт',date:'2026-11-2
 const play:EventFields={title:'Сказка',date:'2026-11-20',time:'16:00',
   type:'play',venue:'orfey',description:''};
 test('events have strictly typed category/venue combinations and real dates',()=>{
-  assert.deepEqual(validateEvent(concert),concert);
+  assert.deepEqual(validateEvent(concert),{...concert,ticketUrl:''});
   assert.throws(()=>validateEvent({...concert,date:'2026-02-30'}),/дата/);
   assert.throws(()=>validateEvent({...concert,date:'2026-13-01'}),/дата/);
   assert.throws(()=>validateEvent({...concert,time:'25:99'}),/время/);
@@ -50,4 +50,14 @@ test('corrupt file does not overwrite last valid events',async()=>{
     await assert.rejects(()=>repo.create(play));
     assert.equal(await readFile(path,'utf8'),'{broken json');
   }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('Muzaticket event URLs are allowlisted and keep legacy entries compatible',()=>{
+  const allowed='https://muzaticket.ru/iframe/organizations/organization-mau-gdk-kirovskii-448753';
+  assert.equal(validateEvent({...concert,ticketUrl:allowed}).ticketUrl,allowed);
+  assert.equal(validateEvent(concert).ticketUrl,'');
+  assert.throws(()=>validateEvent({...concert,ticketUrl:'https://evil.example/pay'}),/Muzaticket/);
+  assert.throws(()=>validateEvent({...concert,ticketUrl:'https://muzaticket.ru.evil.example/iframe'}),/Muzaticket/);
+  assert.throws(()=>validateEvent({...concert,ticketUrl:'javascript:alert(1)'}),/Muzaticket/);
+  assert.throws(()=>validateEvent({...concert,ticketUrl:'http://muzaticket.ru/pay'}),/Muzaticket/);
 });
