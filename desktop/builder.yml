@@ -1,4 +1,4 @@
-# desktop/builder.yml — one portable Windows EXE, no installer or admin rights.
+# desktop/builder.yml — Windows installer and one-file portable EXE, each independently packaged.
 appId: ru.kultura.navikultura
 productName: НавиКультура
 asar: true
@@ -20,7 +20,17 @@ files:
 win:
   target:
     - target: portable
-      arch:
-        - x64
-  artifactName: "Navikultura-${version}-Windows-${arch}.${ext}"
+      arch: [x64]
+    - target: nsis
+      arch: [x64]
   signAndEditExecutable: false
+portable:
+  artifactName: "Navikultura-${version}-Portable-Windows-${arch}.${ext}"
+nsis:
+  artifactName: "Navikultura-${version}-Setup-Windows-${arch}.${ext}"
+  oneClick: true
+  perMachine: false
+  allowElevation: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
